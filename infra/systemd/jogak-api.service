@@ -1,0 +1,18 @@
+[Unit]
+Description=JOGAK FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=guest
+WorkingDirectory=/SSD/guest/chojoonghui/JOGAK
+EnvironmentFile=/SSD/guest/chojoonghui/JOGAK/.env
+Environment=CUDA_VISIBLE_DEVICES=7
+Environment=NVIDIA_VISIBLE_DEVICES=7
+ExecStart=/home/guest/anaconda3/envs/cjh_jogak/bin/uvicorn jogak_api.main:app --app-dir app/backend --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

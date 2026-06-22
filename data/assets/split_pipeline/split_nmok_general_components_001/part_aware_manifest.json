@@ -1,0 +1,64 @@
+{
+  "character_glb": "/SSD/guest/chojoonghui/JOGAK/data/assets/split_pipeline/split_nmok_general_components_001/inputs/character_source.glb",
+  "output_glb": "/SSD/guest/chojoonghui/JOGAK/data/assets/split_pipeline/split_nmok_general_components_001/general_component_scene.glb",
+  "render_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/split_pipeline/split_nmok_general_components_001/general_component_scene_preview.png",
+  "foundation": {
+    "mode": "generic_plinth"
+  },
+  "stage_width": 312,
+  "stage_height": 288,
+  "destination_id": "national_museum_korea",
+  "figurine_id": null,
+  "parts": [
+    {
+      "part_id": "national_museum_korea_part_06_pattern_museum_stair_base",
+      "name": "박물관 계단 베이스",
+      "slot": "pattern",
+      "glb_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/split_pipeline/split_nmok_general_components_001/inputs/national_museum_korea_part_06_pattern_museum_stair_base.glb",
+      "x": 80,
+      "y": 192,
+      "scale": 1.75,
+      "rotation": 0,
+      "opacity": 1,
+      "z_index": 1,
+      "stage_width": 312,
+      "stage_height": 288,
+      "normalized_center": [
+        0.5,
+        0.76
+      ],
+      "integration_mode": "base_attach",
+      "normalized_size": [
+        0.72,
+        0.42
+      ],
+      "image_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/part_06_pattern_박물관_계단_베이스.png",
+      "mask_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/masks/part_06_pattern_박물관_계단_베이스_mask.png"
+    },
+    {
+      "part_id": "national_museum_korea_part_03_body_gold_crown",
+      "name": "금관",
+      "slot": "head",
+      "glb_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/split_pipeline/split_nmok_general_components_001/inputs/national_museum_korea_part_03_body_gold_crown.glb",
+      "x": 110,
+      "y": 4,
+      "scale": 1.1,
+      "rotation": 0,
+      "opacity": 1,
+      "z_index": 10,
+      "stage_width": 312,
+      "stage_height": 288,
+      "normalized_center": [
+        0.5,
+        0.15
+      ],
+      "integration_mode": "wear_head",
+      "normalized_size": [
+        0.28,
+        0.28
+      ],
+      "image_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/part_03_body_금관.png",
+      "mask_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/masks/part_03_body_금관_mask.png"
+    }
+  ]
+}

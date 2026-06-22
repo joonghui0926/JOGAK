@@ -1,0 +1,17 @@
+{
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.jogak.kr/api/:path*"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "https://api.jogak.kr/auth/:path*"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "https://assets.jogak.kr/:path*"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+"""JOGAK FastAPI backend."""
