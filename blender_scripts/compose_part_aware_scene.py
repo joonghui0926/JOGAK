@@ -53,6 +53,35 @@ def make_image_mat(name: str, image_path: Path) -> bpy.types.Material:
     return mat
 
 
+def add_image_card(spec: dict) -> list[bpy.types.Object]:
+    image_path = Path(str(spec.get("image_path") or ""))
+    if not image_path.exists():
+        raise RuntimeError(f"Image card source does not exist: {image_path}")
+
+    image = bpy.data.images.load(str(image_path))
+    width, height = image.size
+    aspect = max(width, 1) / max(height, 1)
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 0, 0))
+    obj = bpy.context.object
+    obj.name = f"preserved image part {spec.get('part_id', 'part')}"
+    if aspect >= 1:
+        obj.scale.x = aspect
+        obj.scale.y = 1.0
+    else:
+        obj.scale.x = 1.0
+        obj.scale.y = 1.0 / aspect
+    if spec.get("integration_mode") != "base_attach":
+        obj.rotation_euler[0] = math.radians(90)
+    obj.data.materials.append(make_image_mat(f"preserved visual {spec.get('part_id', 'part')}", image_path))
+    solid = obj.modifiers.new("thin printable card", "SOLIDIFY")
+    solid.thickness = 0.018
+    solid.offset = 0.0
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=solid.name)
+    obj.visible_shadow = False
+    return [obj]
+
+
 STONE = make_mat("JOGAK warm gray stone", (0.43, 0.41, 0.37, 1.0), 0.78)
 STONE_LIGHT = make_mat("JOGAK plaza stone", (0.54, 0.51, 0.46, 1.0), 0.82)
 STONE_DARK = make_mat("JOGAK engraved dark grooves", (0.10, 0.095, 0.085, 1.0), 0.86)
@@ -94,6 +123,12 @@ def import_glb(path: Path) -> list[bpy.types.Object]:
     if not objects:
         raise RuntimeError(f"No mesh objects imported from {path}")
     return objects
+
+
+def load_part_objects(spec: dict) -> list[bpy.types.Object]:
+    if spec.get("mesh_source") == "image_card" or not spec.get("glb_path"):
+        return add_image_card(spec)
+    return import_glb(Path(spec["glb_path"]))
 
 
 def mesh_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
@@ -458,7 +493,7 @@ def main() -> None:
     base_part_objects: list[bpy.types.Object] = []
     base_groups: list[tuple[dict, list[bpy.types.Object]]] = []
     for spec in base_specs:
-        part_objects = import_glb(Path(spec["glb_path"]))
+        part_objects = load_part_objects(spec)
         place_part(part_objects, spec, stats)
         base_part_objects.extend(part_objects)
         base_groups.append((spec, part_objects))
@@ -472,7 +507,7 @@ def main() -> None:
     all_objects.extend(character_objects)
 
     for spec in remaining_specs:
-        part_objects = import_glb(Path(spec["glb_path"]))
+        part_objects = load_part_objects(spec)
         place_part(part_objects, spec, stats)
         all_objects.extend(part_objects)
 

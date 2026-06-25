@@ -76,15 +76,18 @@ def layer_to_part_spec(
     *,
     layer: PartLayer,
     part: PartAsset,
-    glb_path: Path,
+    glb_path: Path | None,
     stage_width: float,
     stage_height: float,
+    integration_mode: str | None = None,
+    mesh_source: str = "hunyuan_glb",
 ) -> dict:
     width, height = slot_size(part.slot)
     placed_width = width * layer.scale
     placed_height = height * layer.scale
     cx = (layer.x + width * layer.scale / 2) / stage_width
     cy = (layer.y + height * layer.scale / 2) / stage_height
+    mode = integration_mode or infer_integration_mode(layer, part, cx, cy)
     return {
         "part_id": part.id,
         "name": part.name,
@@ -95,7 +98,8 @@ def layer_to_part_spec(
         "allowed_transform": part.allowed_transform or {},
         "fallback_mesh_rule": part.fallback_mesh_rule or {},
         "visual_fidelity_mode": (part.fallback_mesh_rule or {}).get("visual_fidelity_mode"),
-        "glb_path": str(glb_path),
+        "mesh_source": mesh_source,
+        "glb_path": str(glb_path) if glb_path else None,
         "x": layer.x,
         "y": layer.y,
         "scale": layer.scale,
@@ -107,8 +111,19 @@ def layer_to_part_spec(
         "normalized_center": [cx, cy],
         "normalized_size": [placed_width / stage_width, placed_height / stage_height],
         "slot_size": [width, height],
-        "integration_mode": infer_integration_mode(layer, part, cx, cy),
+        "integration_mode": mode,
     }
+
+
+def should_preserve_as_image_card(part: PartAsset, integration_mode: str) -> bool:
+    slot = part.slot.lower()
+    name = part.name.lower()
+    if integration_mode in {"base_attach", "background_behind"}:
+        return True
+    if slot in {"tag", "texture", "pattern", "base"}:
+        return True
+    markers = ("배지", "문양", "지도", "건물", "정자", "누각", "탑", "문", "성벽", "종", "background", "badge", "pattern")
+    return any(marker in name for marker in markers)
 
 
 def generate_part_aware_glb(
@@ -154,10 +169,19 @@ def generate_part_aware_glb(
     part_count = len(visible_layers)
     for index, layer in enumerate(visible_layers, start=1):
         part = part_map[layer.part_asset_id]
+        width, height = slot_size(part.slot)
+        cx = (layer.x + width * layer.scale / 2) / stage_width
+        cy = (layer.y + height * layer.scale / 2) / stage_height
+        integration_mode = infer_integration_mode(layer, part, cx, cy)
         if on_progress:
             start = 68 + round(((index - 1) / max(part_count, 1)) * 20)
             on_progress(f"hunyuan_part_{index}_{part_count}", start)
-        part_glb = generate_part_glb(part, job_id=job_id)
+        if should_preserve_as_image_card(part, integration_mode):
+            part_glb = None
+            mesh_source = "image_card"
+        else:
+            part_glb = generate_part_glb(part, job_id=job_id)
+            mesh_source = "hunyuan_glb"
         if on_progress:
             done = 68 + round((index / max(part_count, 1)) * 20)
             on_progress(f"hunyuan_part_{index}_{part_count}_done", done)
@@ -168,6 +192,8 @@ def generate_part_aware_glb(
                 glb_path=part_glb,
                 stage_width=stage_width,
                 stage_height=stage_height,
+                integration_mode=integration_mode,
+                mesh_source=mesh_source,
             )
         )
 
