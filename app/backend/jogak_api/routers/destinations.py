@@ -3,7 +3,7 @@ from sqlalchemy import or_
 
 from jogak_api.deps import CurrentUser, DBSession
 from jogak_api.db.models import Destination, PartAsset, Unlock
-from jogak_api.schemas import DestinationCultureRead, DestinationRead, PartAssetRead
+from jogak_api.schemas import DestinationCultureRead, DestinationRead, PartAssetRead, PublicDataSourceRead
 from jogak_api.services.public_data import (
     destination_culture_payload,
     part_limited_status,
@@ -80,7 +80,10 @@ def list_parts(destination_id: str, db: DBSession, user: CurrentUser) -> list[Pa
                     "unlocked": part.id in unlocked_ids,
                     "limited": limited,
                     "limited_available": limited_available,
-                    "public_sources": part_public_sources(part),
+                    "public_sources": [
+                        PublicDataSourceRead.model_validate(source)
+                        for source in part_public_sources(part)
+                    ],
                 }
             )
         )

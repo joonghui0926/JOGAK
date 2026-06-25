@@ -34,10 +34,11 @@ def patch_layers(session_id: str, payload: LayersPatchRequest, db: DBSession) ->
     session = db.get(EditorSession, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Editor session not found")
+    layer_payloads = [layer.model_dump() for layer in payload.layers]
     db.query(PartLayer).filter(PartLayer.editor_session_id == session_id).delete()
-    for layer in payload.layers:
-        db.add(PartLayer(editor_session_id=session_id, **layer.model_dump()))
-    session.composition_json = payload.composition_json
+    for layer_payload in layer_payloads:
+        db.add(PartLayer(editor_session_id=session_id, **layer_payload))
+    session.composition_json = {**payload.composition_json, "layers": layer_payloads}
     session.state = "editing"
     db.add(session)
     db.commit()
