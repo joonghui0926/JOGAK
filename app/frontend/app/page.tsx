@@ -479,13 +479,13 @@ export default function JogakApp() {
         ) : (
           <>
             <header className="app-topbar">
-              <div className="brand">
+              <button className="brand brand-button" onClick={() => setScreen("home")} type="button" aria-label="홈으로 이동">
                 <img src="/icons/jogak-transparent.png" alt="" />
                 <div>
                   <span>조각</span>
                   <strong>{screenTitles[screen]}</strong>
                 </div>
-              </div>
+              </button>
               <ServiceWorkerRegister />
             </header>
 
