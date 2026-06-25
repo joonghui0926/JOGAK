@@ -43,8 +43,14 @@ export async function fetchDestinationCulture(destinationId: string): Promise<De
   return apiFetch<DestinationCulture>(`/api/destinations/${destinationId}/culture`);
 }
 
+export type AuthUser = { id: string; email?: string | null; display_name: string; is_guest: boolean; role?: string };
+
+export async function fetchMe() {
+  return apiFetch<AuthUser>("/auth/me");
+}
+
 export async function createGuestSession() {
-  return apiFetch<{ access_token: string; user: { id: string; display_name: string; is_guest: boolean } }>(
+  return apiFetch<{ access_token: string; user: AuthUser }>(
     "/auth/guest",
     { method: "POST" }
   );
@@ -55,7 +61,7 @@ export async function startEmailLogin(email: string) {
     ok: boolean;
     message: string;
     access_token?: string;
-    user?: { id: string; display_name: string; is_guest: boolean };
+    user?: AuthUser;
   }>("/auth/email/start", {
     method: "POST",
     body: JSON.stringify({ email })
@@ -69,10 +75,10 @@ export async function createPretravelConcept(form: FormData) {
   });
 }
 
-export async function checkVisit(destinationId: string, lat: number, lon: number, accuracyM = 30) {
+export async function checkVisit(destinationId: string, lat: number, lon: number, accuracyM = 30, reviewBypass = false) {
   return apiFetch<{ verified: boolean; unlocked_parts: string[]; distance_m: number }>("/api/visits/check", {
     method: "POST",
-    body: JSON.stringify({ destination_id: destinationId, lat, lon, accuracy_m: accuracyM, dwell_seconds: 180 })
+    body: JSON.stringify({ destination_id: destinationId, lat, lon, accuracy_m: accuracyM, dwell_seconds: 180, review_bypass: reviewBypass })
   });
 }
 

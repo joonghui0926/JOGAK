@@ -1,0 +1,47 @@
+{
+  "destination": {
+    "id": "national_museum_korea",
+    "name": "국립중앙박물관",
+    "dna": "유물·전시·교육"
+  },
+  "user_photo": "/SSD/guest/chojoonghui/JOGAK/증명사진_2026.jpg",
+  "selected_parts": [
+    {
+      "id": "national_museum_korea_pattern_06",
+      "slot": "pattern",
+      "name": "박물관 계단 베이스",
+      "image_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/part_06_pattern_박물관_계단_베이스.png"
+    },
+    {
+      "id": "national_museum_korea_body_03",
+      "slot": "body",
+      "name": "금관",
+      "image_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/part_03_body_금관.png"
+    },
+    {
+      "id": "national_museum_korea_base_01",
+      "slot": "base",
+      "name": "청자 병",
+      "image_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/part_01_base_청자_병.png"
+    },
+    {
+      "id": "national_museum_korea_pose_08",
+      "slot": "pose",
+      "name": "고지도 두루마리",
+      "image_path": "/SSD/guest/chojoonghui/JOGAK/data/assets/parts/national_museum_korea/part_08_pose_고지도_두루마리.png"
+    }
+  ],
+  "outputs": {
+    "pretravel_preview_2d": "/SSD/guest/chojoonghui/JOGAK/data/examples/national_museum_demo_20260626/01_pretravel_preview_2d.png",
+    "pretravel_preview_3d": "/SSD/guest/chojoonghui/JOGAK/data/examples/national_museum_demo_20260626/02_pretravel_preview_3d.glb",
+    "pretravel_preview_3d_capture": "/SSD/guest/chojoonghui/JOGAK/data/examples/national_museum_demo_20260626/02_pretravel_preview_3d_blender_preview.png",
+    "parts_arranged_canvas": "/SSD/guest/chojoonghui/JOGAK/data/examples/national_museum_demo_20260626/03_parts_arranged_canvas.png",
+    "after_parts_refined_2d": "/SSD/guest/chojoonghui/JOGAK/data/examples/national_museum_demo_20260626/04_after_parts_refined_2d.png",
+    "final_3d": "/SSD/guest/chojoonghui/JOGAK/data/examples/national_museum_demo_20260626/05_final_3d.glb",
+    "final_3d_capture": "/SSD/guest/chojoonghui/JOGAK/data/examples/national_museum_demo_20260626/05_final_3d_blender_preview.png"
+  },
+  "prompts": {
+    "pretravel_preview": "Create one production-ready 2D concept image for a pre-travel collectible figurine base. If a user portrait is provided, preserve only the person's broad impression and friendly likeness cues; turn the person into a stylized full-body figurine, not a realistic portrait. Keep the face clean and Hunyuan-friendly: young adult proportions when appropriate, simple attractive vinyl-toy facial planes, clear glasses/hair/nose/mouth cues from the portrait, no random anime face, no childlike face unless requested, no realistic pores, and no distorted mouth or melted eyewear. Use a front three-quarter view, centered full body, clean silhouette, thick printable parts, single subject, isolated on a transparent PNG background with one stable plinth/base and, when useful, a shallow destination backdrop relief attached to the base. Do not create a separate full environment scene. Do not include unlocked souvenirs, relic props, artifacts, ceramics, crowns, badges, hand-held objects, side objects, or collectible parts. Those are locked until the trip. Only express the destination through subtle outfit styling, color palette, base/plinth silhouette, material mood, shallow rear backdrop shapes, and architectural rhythm on the base. No readable text anywhere. For National Museum of Korea, make the place identity come from architecture and spatial mood only: a broad low modern stone museum silhouette, pale limestone and warm gray granite, glass hall reflections, the central plaza and grand stair rhythm, quiet exhibition lighting, and abstract floor-plan lines on the base. The base should look like a miniature museum plaza/plinth, not a souvenir display. Do not use Hangul, English, numbers, plaques, labels, logos, readable engraving, or any text-like marks. Destination: 국립중앙박물관. Cultural DNA: 유물·전시·교육. Constraints from linked official public-data records. Use these only for historical material, color, motif, and identity; do not invent conflicting details: destination: 국립중앙박물관; destination: 국립중앙박물관 어린이박물관; destination: 국립중앙박물관 전통염료식물원; destination: 국립중앙박물관 (period=삼국-조선, institution=한국관광공사 TourAPI 연동 대상); heritage: 청자 prop (period=삼국-조선, material=석재, 목재, 기와, institution=JOGAK 공공데이터 보강 카탈로그); heritage: 금관 head (period=삼국-조선, material=직물, 도자, 금속, institution=JOGAK 공공데이터 보강 카탈로그); pattern: 계단 base (period=삼국-조선, material=단청, 직물, 문양, institution=JOGAK 공공데이터 보강 카탈로그); heritage: 고지도 scroll (period=삼국-조선, material=인물 동작, 장소 경험, institution=JOGAK 공공데이터 보강 카탈로그) User style: 성인 얼굴 비율의 책상용 컬러 피규어, 둥근 검정 안경과 자연스러운 검은 머리, 베이지 니트 느낌을 단순화한 의상. User note: 차분한 박물관 탐험가 느낌. 해금 부품은 절대 넣지 말고, 국립중앙박물관의 현대 석재 건축, 중앙 광장, 계단 리듬, 전시 공간의 차분한 조명만 옷과 원판/얕은 배경 릴리프로 표현..",
+    "after_parts_refine": "Create one final 2D figurine concept from the provided pre-travel figurine image, the editor canvas composite, and the individual unlocked transparent part images. Treat the editor canvas composite as the source of truth for placement intent. Preserve the original figurine identity, pose, proportions, outfit, base design, and the recognizable silhouette, color, texture, and motif of every unlocked part. Keep the character face clean and Hunyuan-friendly: preserve portrait-derived adult likeness cues, keep the face large and readable, use smooth vinyl/resin toy facial planes, crisp eyewear and hair shapes, simple calm eyes and mouth, no childlike/random anime face unless requested, no realistic pore texture, no distorted lips, and no melted glasses. Do not let headwear, hair, props, or shadows cover the eyes, glasses, nose, or mouth. Do not redesign, replace, simplify, duplicate, or invent parts. Do not turn parts into new objects. There must be exactly one visible instance of each unlocked part in the final image. If a part is integrated as worn headwear, held in a hand, attached to the body, seated on the base, or moved behind the figure, the original standalone/floating copy must disappear. Only make physically necessary integration changes: natural occlusion ordering, soft contact shadows, contact alignment to the base, perspective matching, and tiny hand-contact deformation when a part is placed in or near a hand. If a crown, hat, helmet, or head ornament is placed on or above the head, make it worn by the character and remove the separate pasted copy. If a tower, gate, pavilion, wall, or scenery-like part is placed behind the character, place it as background scenery while keeping its shape and scale recognizable. If a ceramic, tool, tag, scroll, or prop is placed near a hand, let the fingers gently hold or support it without changing the part's core outline, and remove the separate pasted copy after it becomes held. If a part is placed on the base, seat it on the plinth with stable contact. Keep user scale, rotation, z-order, and relative position recognizable, but resolve impossible overlaps in the least destructive way. Use a clean centered three-quarter product concept render isolated on a transparent PNG background. Use a single coherent final image suitable for Hunyuan 3D conversion, with thick printable details, clear silhouette, and no loose floating fragments. Make the final image 3D-conversion-friendly: all base and architecture elements must be chunky, solid, connected toy-like forms. Do not create thin architectural walls, long unsupported overhangs, hollow window cutouts, open holes, water holes, transparent glass gaps, fine railings, needle-thin stairs, or delicate negative spaces. Express buildings as shallow relief blocks, engraved grooves, raised silhouettes, and sturdy stepped forms on the plinth instead of real hollow architecture. Keep the bottom plinth as one continuous stable disk or rounded polygon with visible thickness and no torn perimeter. Do not add readable text, labels, plaques, logos, or numbers unless they already exist inside a provided unlocked part image. Destination: 국립중앙박물관. Cultural DNA: 유물·전시·교육. Constraints from linked official public-data records. Use these only for historical material, color, motif, and identity; do not invent conflicting details: destination: 국립중앙박물관; destination: 국립중앙박물관 어린이박물관; destination: 국립중앙박물관 전통염료식물원; destination: 국립중앙박물관 (period=삼국-조선, institution=한국관광공사 TourAPI 연동 대상); heritage: 청자 prop (period=삼국-조선, material=석재, 목재, 기와, institution=JOGAK 공공데이터 보강 카탈로그); heritage: 금관 head (period=삼국-조선, material=직물, 도자, 금속, institution=JOGAK 공공데이터 보강 카탈로그); pattern: 계단 base (period=삼국-조선, material=단청, 직물, 문양, institution=JOGAK 공공데이터 보강 카탈로그); heritage: 고지도 scroll (period=삼국-조선, material=인물 동작, 장소 경험, institution=JOGAK 공공데이터 보강 카탈로그) Unlocked parts in this composition: 박물관 계단 베이스, 금관, 청자 병, 고지도 두루마리. Placement notes from the editor canvas: 박물관 계단 베이스는 원판 위 전경 바닥에 넓고 안정적으로 붙인다. 금관은 머리 위에 실제로 착용시켜 별도 떠 있는 복사본은 없앤다. 청자 병은 왼손 쪽에 들거나 몸 옆에 기대게 하되 원형과 문양을 유지한다. 고지도 두루마리는 오른손에 자연스럽게 쥐게 하며 펼쳐진 실루엣과 색을 유지한다.. User style: 책상용 컬러 피규어, Hunyuan 3D 변환 친화적인 두꺼운 프린팅 형태. User note: 사용자가 해금 부품을 배치한 최종 조각. 각 부품은 생김새와 색, 문양을 바꾸지 않고 자연스럽게 착용/손잡이/원판 위 구조로 통합한다.."
+  }
+}

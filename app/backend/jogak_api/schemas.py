@@ -97,6 +97,7 @@ class VisitCheckRequest(BaseModel):
     lon: float
     accuracy_m: float = 50
     dwell_seconds: int = 0
+    review_bypass: bool = False
 
 
 class VisitCheckResponse(BaseModel):

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from jogak_api.core.config import get_settings
 from jogak_api.core.security import create_access_token
+from jogak_api.deps import CurrentUser
 from jogak_api.db.models import Account, User
 from jogak_api.db.session import get_db
 from jogak_api.schemas import AuthToken, EmailStartRequest, UserRead
@@ -50,6 +51,13 @@ def email_start(payload: EmailStartRequest, db: Session = Depends(get_db)) -> di
         "access_token": create_access_token(user.id, is_guest=False),
         "user": UserRead.model_validate(user).model_dump(),
     }
+
+
+@router.get("/me", response_model=UserRead)
+def me(user: CurrentUser) -> UserRead:
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return UserRead.model_validate(user)
 
 
 @router.get("/oauth/{provider}")
@@ -286,6 +294,7 @@ def _redirect_with_auth_token(user: User, provider: str) -> RedirectResponse:
             "auth_token": jogak_token,
             "auth_provider": provider,
             "user_name": user.display_name,
+            "user_email": user.email or "",
         }
     )
     return RedirectResponse(f"{frontend_url}/#{fragment}")

@@ -1453,7 +1453,19 @@ button {
   }
 
   .button-stack {
-    max-width: 520px;
+    width: min(620px, 100%);
+    max-width: none;
+    margin: 28px auto 0;
+    gap: 12px;
+  }
+
+  .button-stack .primary,
+  .button-stack .secondary {
+    min-height: 54px;
+  }
+
+  .button-stack .primary:first-child:nth-last-child(n + 2) {
+    grid-column: 1 / -1;
   }
 
   .button-stack:has(.secondary + .secondary),
@@ -1463,11 +1475,20 @@ button {
 
   .button-stack .primary:first-child:last-child,
   .button-stack .secondary:first-child:last-child {
-    grid-column: auto;
+    width: min(420px, 100%);
+    grid-column: 1 / -1;
+    justify-self: center;
   }
 
   .button-stack .primary:first-child:nth-last-child(3) {
     grid-column: 1 / -1;
+  }
+
+  .model-viewer + .chips,
+  .model-fallback + .chips {
+    width: min(620px, 100%);
+    margin: 18px auto 0;
+    justify-content: center;
   }
 }
 

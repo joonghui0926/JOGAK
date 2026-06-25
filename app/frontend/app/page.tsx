@@ -58,6 +58,7 @@ import {
   fetchDestinationParts,
   fetchDestinations,
   fetchJob,
+  fetchMe,
   finalizeEditor3D,
   patchEditorLayers,
   refineEditor2D,
@@ -76,6 +77,7 @@ import type {
 } from "../lib/types";
 
 const API_BASE = getApiBase();
+const REVIEW_UNLOCK_EMAIL = "jjoonghui@gmail.com";
 
 const screenTitles: Partial<Record<Screen, string>> = {
   home: "나의 조각장",
@@ -102,6 +104,7 @@ export default function JogakApp() {
   const [query, setQuery] = useState("");
   const [email, setEmail] = useState("");
   const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
   const [loginNotice, setLoginNotice] = useState("");
   const [prompt, setPrompt] = useState("차분한 박물관 탐험가 느낌, 국립중앙박물관의 석재 광장과 전시 공간 분위기를 옷과 밑판에만 은은하게");
   const [style, setStyle] = useState("책상 피규어");
@@ -123,16 +126,25 @@ export default function JogakApp() {
 
   useEffect(() => {
     const storedName = window.localStorage.getItem("jogak_user_name");
+    const storedEmail = window.localStorage.getItem("jogak_user_email");
     const storedToken = window.localStorage.getItem("jogak_access_token");
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const oauthToken = params.get("auth_token");
     const oauthName = params.get("user_name");
+    const oauthEmail = params.get("user_email");
 
     if (oauthToken) {
       setAuthToken(oauthToken);
       if (oauthName) {
         window.localStorage.setItem("jogak_user_name", oauthName);
         setUserName(oauthName);
+      }
+      if (oauthEmail) {
+        window.localStorage.setItem("jogak_user_email", oauthEmail);
+        setUserEmail(oauthEmail);
+      } else {
+        window.localStorage.removeItem("jogak_user_email");
+        setUserEmail("");
       }
       setLoginNotice("");
       setScreen("home");
@@ -142,7 +154,20 @@ export default function JogakApp() {
 
     if (storedToken) {
       setUserName(storedName || "Google 사용자");
+      setUserEmail(storedEmail || "");
       setScreen("home");
+      fetchMe()
+        .then((user) => {
+          setUserName(user.display_name);
+          setUserEmail(user.email || "");
+          window.localStorage.setItem("jogak_user_name", user.display_name);
+          if (user.email) {
+            window.localStorage.setItem("jogak_user_email", user.email);
+          } else {
+            window.localStorage.removeItem("jogak_user_email");
+          }
+        })
+        .catch(() => undefined);
     }
   }, []);
 
@@ -230,9 +255,12 @@ export default function JogakApp() {
       const session = await createGuestSession();
       setAuthToken(session.access_token);
       window.localStorage.setItem("jogak_user_name", session.user.display_name);
+      window.localStorage.removeItem("jogak_user_email");
       setUserName(session.user.display_name);
+      setUserEmail("");
     } catch {
       setUserName("게스트 여행자");
+      setUserEmail("");
     }
     setScreen("home");
   }
@@ -247,7 +275,13 @@ export default function JogakApp() {
       if (result.access_token && result.user) {
         setAuthToken(result.access_token);
         window.localStorage.setItem("jogak_user_name", result.user.display_name);
+        if (result.user.email) {
+          window.localStorage.setItem("jogak_user_email", result.user.email);
+        } else {
+          window.localStorage.removeItem("jogak_user_email");
+        }
         setUserName(result.user.display_name);
+        setUserEmail(result.user.email || "");
         setScreen("home");
       }
       setLoginNotice(result.message);
@@ -289,6 +323,29 @@ export default function JogakApp() {
       setUnlockNotice("관광지를 먼저 선택해 주세요.");
       return;
     }
+    const applyUnlockedParts = async (unlockedPartIds: string[], message: string) => {
+      const nextParts = partAssets.length ? partAssets : await fetchDestinationParts(selectedDestination.id);
+      setPartAssets(nextParts);
+      setUnlockedParts(unlockedPartIds);
+      const nextLayers = buildUnlockedLayers(nextParts, unlockedPartIds);
+      setLayers(nextLayers);
+      setSelectedLayer(nextLayers[0]?.id || "");
+      setUnlockNotice(message);
+    };
+
+    if (userEmail.toLowerCase() === REVIEW_UNLOCK_EMAIL) {
+      try {
+        setUnlockNotice("심사 계정 확인 중입니다.");
+        const result = await checkVisit(selectedDestination.id, selectedDestination.lat, selectedDestination.lon, 1, true);
+        if (result.verified) {
+          await applyUnlockedParts(result.unlocked_parts, `${selectedDestination.name} 심사 계정으로 부품 ${result.unlocked_parts.length}개가 열렸어요.`);
+          return;
+        }
+      } catch {
+        setUnlockNotice("심사 계정 우회 확인에 실패했습니다. GPS 위치 확인으로 이어갑니다.");
+      }
+    }
+
     if (!navigator.geolocation) {
       setUnlockNotice("이 브라우저에서는 위치 확인을 사용할 수 없습니다.");
       return;
@@ -300,13 +357,7 @@ export default function JogakApp() {
         try {
           const result = await checkVisit(selectedDestination.id, latitude, longitude, accuracy || 50);
           if (result.verified) {
-            const nextParts = partAssets.length ? partAssets : await fetchDestinationParts(selectedDestination.id);
-            setPartAssets(nextParts);
-            setUnlockedParts(result.unlocked_parts);
-            const nextLayers = buildUnlockedLayers(nextParts, result.unlocked_parts);
-            setLayers(nextLayers);
-            setSelectedLayer(nextLayers[0]?.id || "");
-            setUnlockNotice(`${selectedDestination.name} 방문이 확인됐습니다. 부품 ${result.unlocked_parts.length}개가 열렸어요.`);
+            await applyUnlockedParts(result.unlocked_parts, `${selectedDestination.name} 방문이 확인됐습니다. 부품 ${result.unlocked_parts.length}개가 열렸어요.`);
           } else {
             setUnlockNotice(`아직 반경 밖입니다. 현재 약 ${Math.round(result.distance_m)}m 떨어져 있어요.`);
           }
