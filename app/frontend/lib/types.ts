@@ -97,6 +97,28 @@ export type EditorLayer = {
   imageUrl?: string | null;
 };
 
+export type FigurineAsset = {
+  id: string;
+  type: string;
+  path: string;
+  url?: string | null;
+  mime: string;
+  checksum?: string | null;
+  size_bytes?: number | null;
+};
+
+export type Figurine = {
+  id: string;
+  destination_id: string;
+  title: string;
+  stage: string;
+  style: string;
+  dna_snapshot_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  assets: FigurineAsset[];
+};
+
 export type JobStatus = {
   id: string;
   status: string;

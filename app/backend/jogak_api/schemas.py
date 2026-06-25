@@ -161,6 +161,7 @@ class AssetRead(BaseModel):
     id: str
     type: str
     path: str
+    url: str | None = None
     mime: str
     checksum: str | None = None
     size_bytes: int | None = None
@@ -175,6 +176,8 @@ class FigurineRead(BaseModel):
     stage: str
     style: str
     dna_snapshot_json: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
     assets: list[AssetRead] = Field(default_factory=list)
 
 

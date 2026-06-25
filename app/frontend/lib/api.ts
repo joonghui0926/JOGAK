@@ -1,4 +1,4 @@
-import type { Destination, DestinationCulture, EditorLayer, JobStatus, PartAsset } from "./types";
+import type { Destination, DestinationCulture, EditorLayer, Figurine, JobStatus, PartAsset } from "./types";
 import { getApiBase } from "./config";
 
 const API_BASE = getApiBase();
@@ -84,6 +84,10 @@ export async function checkVisit(destinationId: string, lat: number, lon: number
 
 export async function fetchJob(jobId: string): Promise<JobStatus> {
   return apiFetch<JobStatus>(`/api/jobs/${jobId}`);
+}
+
+export async function fetchFigurines(): Promise<Figurine[]> {
+  return apiFetch<Figurine[]>("/api/figurines");
 }
 
 export async function createEditorSession(destinationId: string, figurineId?: string | null) {

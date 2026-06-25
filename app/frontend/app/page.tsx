@@ -39,6 +39,7 @@ import {
   Send,
   Share2,
   Sparkles,
+  Trash2,
   Truck,
   Undo2,
   Unlock,
@@ -57,6 +58,7 @@ import {
   fetchDestinationCulture,
   fetchDestinationParts,
   fetchDestinations,
+  fetchFigurines,
   fetchJob,
   fetchMe,
   finalizeEditor3D,
@@ -70,6 +72,7 @@ import type {
   Destination,
   DestinationCulture,
   EditorLayer,
+  Figurine,
   JobStatus,
   PartAsset,
   PublicDataSource,
@@ -79,11 +82,20 @@ import type {
 const API_BASE = getApiBase();
 const REVIEW_UNLOCK_EMAIL = "jjoonghui@gmail.com";
 const ACTIVE_JOB_STORAGE_KEY = "jogak_active_job_id";
+const SAVED_PREVIEWS_STORAGE_PREFIX = "jogak_saved_previews_v1";
 
 type JobNotice = {
   job: JobStatus;
   title: string;
   message: string;
+};
+
+type SavedPreview = {
+  destinationId: string;
+  figurineId: string;
+  conceptUrl: string;
+  glbUrl?: string | null;
+  updatedAt: string;
 };
 
 const screenTitles: Partial<Record<Screen, string>> = {
@@ -125,11 +137,63 @@ function jobStatusLabel(job: JobStatus | null): string {
   return "대기열 확인";
 }
 
+function previewStorageKey(email: string) {
+  return `${SAVED_PREVIEWS_STORAGE_PREFIX}:${email.trim().toLowerCase() || "guest"}`;
+}
+
+function readSavedPreviews(email: string): Record<string, SavedPreview> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(previewStorageKey(email)) || "{}") as Record<string, SavedPreview>;
+  } catch {
+    return {};
+  }
+}
+
+function writeSavedPreviews(email: string, previews: Record<string, SavedPreview>) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(previewStorageKey(email), JSON.stringify(previews));
+}
+
+function assetPublicUrl(asset: Figurine["assets"][number] | undefined) {
+  if (!asset) return null;
+  if (asset.url) return asset.url;
+  return asset.path.startsWith("http") ? asset.path : null;
+}
+
+function savedPreviewFromFigurine(figurine: Figurine): SavedPreview | null {
+  const conceptAsset = figurine.assets.find((asset) => asset.type === "pretravel_concept_2d")
+    || figurine.assets.find((asset) => asset.type === "concept_2d");
+  const conceptUrl = assetPublicUrl(conceptAsset);
+  if (!conceptUrl) return null;
+  return {
+    destinationId: figurine.destination_id,
+    figurineId: figurine.id,
+    conceptUrl,
+    glbUrl: assetPublicUrl(figurine.assets.find((asset) => asset.type === "preview_glb")),
+    updatedAt: figurine.updated_at || figurine.created_at || new Date().toISOString()
+  };
+}
+
+function mergeSavedPreviews(current: Record<string, SavedPreview>, figurines: Figurine[]) {
+  const next = { ...current };
+  for (const figurine of figurines) {
+    const preview = savedPreviewFromFigurine(figurine);
+    if (!preview) continue;
+    const existing = next[preview.destinationId];
+    if (!existing || new Date(preview.updatedAt).getTime() >= new Date(existing.updatedAt).getTime()) {
+      next[preview.destinationId] = preview;
+    }
+  }
+  return next;
+}
+
 export default function JogakApp() {
   const [screen, setScreen] = useState<Screen>("login");
   const [storyReturnScreen, setStoryReturnScreen] = useState<Screen>("destination");
   const [jobReturnScreen, setJobReturnScreen] = useState<Screen>("home");
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [query, setQuery] = useState("");
   const [email, setEmail] = useState("");
@@ -152,6 +216,7 @@ export default function JogakApp() {
   const [cultureData, setCultureData] = useState<DestinationCulture | null>(null);
   const [layers, setLayers] = useState<EditorLayer[]>([]);
   const [selectedLayer, setSelectedLayer] = useState("");
+  const [savedPreviews, setSavedPreviews] = useState<Record<string, SavedPreview>>({});
   const [dragState, setDragState] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [pretravelConceptUrl, setPretravelConceptUrl] = useState<string | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -237,20 +302,49 @@ export default function JogakApp() {
   }, []);
 
   useEffect(() => {
+    const localPreviews = readSavedPreviews(userEmail);
+    setSavedPreviews(localPreviews);
+    if (!window.localStorage.getItem("jogak_access_token")) return;
+    let cancelled = false;
+
+    fetchFigurines()
+      .then((figurines) => {
+        if (cancelled) return;
+        const merged = mergeSavedPreviews(localPreviews, figurines);
+        setSavedPreviews(merged);
+        writeSavedPreviews(userEmail, merged);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userEmail]);
+
+  useEffect(() => {
+    fetchDestinations("")
+      .then((items) => {
+        setAllDestinations(items);
+        if (!selectedDestination && items.length) {
+          setSelectedDestination(items[0]);
+        }
+      })
+      .catch(() => setAllDestinations([]));
+  }, []);
+
+  useEffect(() => {
     fetchDestinations(query)
       .then((items) => {
         setDestinations(items);
         if (!items.length) {
-          setSelectedDestination(null);
           return;
         }
-        if (!selectedDestination || !items.some((item) => item.id === selectedDestination.id)) {
+        if (!selectedDestination) {
           setSelectedDestination(items[0]);
         }
       })
       .catch(() => {
         setDestinations([]);
-        setSelectedDestination(null);
       });
   }, [query, selectedDestination?.id]);
 
@@ -301,6 +395,17 @@ export default function JogakApp() {
       cancelled = true;
     };
   }, [selectedDestination?.id, userEmail]);
+
+  useEffect(() => {
+    if (!selectedDestination) {
+      setPretravelConceptUrl(null);
+      setCurrentFigurineId(null);
+      return;
+    }
+    const savedPreview = savedPreviews[selectedDestination.id];
+    setPretravelConceptUrl(savedPreview?.conceptUrl || null);
+    setCurrentFigurineId(savedPreview?.figurineId || null);
+  }, [selectedDestination?.id, savedPreviews]);
 
   useEffect(() => {
     if (!job?.id || ["done", "failed"].includes(job.status)) return;
@@ -364,10 +469,19 @@ export default function JogakApp() {
     window.localStorage.setItem(ACTIVE_JOB_STORAGE_KEY, nextJob.id);
   }
 
+  function rememberPreview(preview: SavedPreview) {
+    setSavedPreviews((current) => {
+      const next = { ...current, [preview.destinationId]: preview };
+      writeSavedPreviews(userEmail, next);
+      return next;
+    });
+  }
+
   function handleFinishedJob(nextJob: JobStatus) {
     const conceptUrl = typeof nextJob.result?.concept_url === "string" ? nextJob.result.concept_url : null;
     const figurineId = typeof nextJob.result?.figurine_id === "string" ? nextJob.result.figurine_id : null;
     const destinationId = typeof nextJob.result?.destination_id === "string" ? nextJob.result.destination_id : null;
+    const glbUrl = typeof nextJob.result?.glb_url === "string" ? nextJob.result.glb_url : null;
     if (conceptUrl && nextJob.type === "pretravel_concept") {
       setPretravelConceptUrl(conceptUrl);
     }
@@ -375,10 +489,20 @@ export default function JogakApp() {
       setCurrentFigurineId(figurineId);
     }
     if (destinationId) {
-      const destination = destinations.find((item) => item.id === destinationId);
+      const destination = allDestinations.find((item) => item.id === destinationId)
+        || destinations.find((item) => item.id === destinationId);
       if (destination) {
         setSelectedDestination(destination);
       }
+    }
+    if (conceptUrl && figurineId && destinationId && nextJob.type === "pretravel_concept") {
+      rememberPreview({
+        destinationId,
+        figurineId,
+        conceptUrl,
+        glbUrl,
+        updatedAt: new Date().toISOString()
+      });
     }
 
     setJob(nextJob);
@@ -604,6 +728,14 @@ export default function JogakApp() {
     setScreen("destination");
   }
 
+  function selectUnlockDestination(destinationId: string) {
+    const destination = allDestinations.find((item) => item.id === destinationId)
+      || destinations.find((item) => item.id === destinationId);
+    if (!destination) return;
+    setSelectedDestination(destination);
+    setUnlockNotice(`${destination.name} 해금 장소를 확인합니다.`);
+  }
+
   function handlePhotoChange(file: File | null) {
     setPhotoFile(file);
     setPhotoName(file?.name || "");
@@ -637,6 +769,23 @@ export default function JogakApp() {
           : layer
       )
     );
+  }
+
+  function addLayer(template: EditorLayer) {
+    setLayers((items) => {
+      if (items.some((layer) => layer.id === template.id)) return items;
+      const nextZ = Math.max(0, ...items.map((layer) => layer.z)) + 1;
+      return [...items, { ...template, z: nextZ }];
+    });
+    setSelectedLayer(template.id);
+  }
+
+  function removeLayer(id: string) {
+    const nextSelected = layers.find((layer) => layer.id !== id)?.id || "";
+    setLayers((items) => items.filter((layer) => layer.id !== id));
+    if (selectedLayer === id) {
+      setSelectedLayer(nextSelected);
+    }
   }
 
   function adjustLayer(update: Partial<Pick<EditorLayer, "scale" | "rotation" | "z">>) {
@@ -805,7 +954,15 @@ export default function JogakApp() {
 
               {screen === "unlock" && (
                 selectedDestination ? (
-                  <UnlockScreen destination={selectedDestination} notice={unlockNotice} unlockedParts={unlockedParts} onUnlock={handleUnlock} onCustomize={() => setScreen("customize")} />
+                  <UnlockScreen
+                    destination={selectedDestination}
+                    destinations={allDestinations.length ? allDestinations : destinations}
+                    notice={unlockNotice}
+                    unlockedParts={unlockedParts}
+                    onDestinationChange={selectUnlockDestination}
+                    onUnlock={handleUnlock}
+                    onCustomize={() => setScreen("customize")}
+                  />
                 ) : (
                   <DestinationRequired onExplore={() => setScreen("explore")} />
                 )
@@ -823,6 +980,7 @@ export default function JogakApp() {
                 <EditorScreen
                   layers={layers}
                   selected={selected}
+                  availableLayers={buildUnlockedLayers(partAssets, unlockedParts)}
                   destination={selectedDestination}
                   basePreviewUrl={pretravelConceptUrl || resultString(job, "concept_url") || null}
                   stageRef={stageRef}
@@ -830,6 +988,8 @@ export default function JogakApp() {
                   onPointerUp={() => setDragState(null)}
                   onLayerPointerDown={onLayerPointerDown}
                   onSelect={setSelectedLayer}
+                  onAddLayer={addLayer}
+                  onRemoveLayer={removeLayer}
                   onAdjust={adjustLayer}
                   onSetLayer={setLayerTransform}
                   onReset={resetSelectedLayer}
@@ -841,7 +1001,14 @@ export default function JogakApp() {
 
               {screen === "preview" && (
                 selectedDestination ? (
-                  <PreviewScreen destination={selectedDestination} job={job} onPrint={() => setScreen("print")} onEdit={() => setScreen("editor")} onStory={() => openStory("preview")} />
+                  <PreviewScreen
+                    destination={selectedDestination}
+                    job={job}
+                    savedPreview={savedPreviews[selectedDestination.id] || null}
+                    onPrint={() => setScreen("print")}
+                    onEdit={() => setScreen("editor")}
+                    onStory={() => openStory("preview")}
+                  />
                 ) : (
                   <DestinationRequired onExplore={() => setScreen("explore")} />
                 )
@@ -1308,14 +1475,18 @@ function PartsScreen({
 
 function UnlockScreen({
   destination,
+  destinations,
   notice,
   unlockedParts,
+  onDestinationChange,
   onUnlock,
   onCustomize
 }: {
   destination: Destination;
+  destinations: Destination[];
   notice: string;
   unlockedParts: string[];
+  onDestinationChange: (destinationId: string) => void;
   onUnlock: () => void;
   onCustomize: () => void;
 }) {
@@ -1329,6 +1500,14 @@ function UnlockScreen({
         </button>
       </div>
       <p className="desc">{notice}</p>
+      <label className="select-row">
+        <span>해금 장소</span>
+        <select value={destination.id} onChange={(event) => onDestinationChange(event.target.value)}>
+          {destinations.map((item) => (
+            <option key={item.id} value={item.id}>{item.name}</option>
+          ))}
+        </select>
+      </label>
       <div className="map-panel compact">
         <iframe
           title={`${destination.name} 해금 지도`}
@@ -1506,6 +1685,7 @@ function GenerateScreen({
 function EditorScreen({
   layers,
   selected,
+  availableLayers,
   destination,
   basePreviewUrl,
   stageRef,
@@ -1513,6 +1693,8 @@ function EditorScreen({
   onPointerUp,
   onLayerPointerDown,
   onSelect,
+  onAddLayer,
+  onRemoveLayer,
   onAdjust,
   onSetLayer,
   onReset,
@@ -1522,6 +1704,7 @@ function EditorScreen({
 }: {
   layers: EditorLayer[];
   selected: EditorLayer | null;
+  availableLayers: EditorLayer[];
   destination: Destination | null;
   basePreviewUrl: string | null;
   stageRef: React.RefObject<HTMLDivElement | null>;
@@ -1529,6 +1712,8 @@ function EditorScreen({
   onPointerUp: () => void;
   onLayerPointerDown: (event: React.PointerEvent, layer: EditorLayer) => void;
   onSelect: (id: string) => void;
+  onAddLayer: (layer: EditorLayer) => void;
+  onRemoveLayer: (id: string) => void;
   onAdjust: (update: Partial<Pick<EditorLayer, "scale" | "rotation" | "z">>) => void;
   onSetLayer: (id: string, update: Partial<Pick<EditorLayer, "scale" | "rotation" | "z">>) => void;
   onReset: () => void;
@@ -1537,12 +1722,13 @@ function EditorScreen({
   onComplete: () => void;
 }) {
   const selectedSize = selected ? layerSize(selected.slot) : { width: 72, height: 72 };
+  const placedIds = new Set(layers.map((layer) => layer.id));
   return (
     <div className="screen-section editor-workflow">
       <div className="screen-heading">
         <div>
           <h1>프리뷰 위에 부품 배치</h1>
-          <p className="section-kicker">{destination?.name || "선택한 장소"} · {layers.length}개 해금 부품</p>
+          <p className="section-kicker">{destination?.name || "선택한 장소"} · {layers.length}/{availableLayers.length}개 사용 중</p>
         </div>
         <button className="icon-text" onClick={onSave} type="button">
           <Save aria-hidden />
@@ -1593,7 +1779,7 @@ function EditorScreen({
                     );
                   })
               ) : (
-                <div className="empty-stage">해금된 2D 부품 이미지가 아직 없습니다.</div>
+                <div className="empty-stage">{availableLayers.length ? "아래 트레이에서 사용할 부품을 추가하세요." : "해금된 2D 부품 이미지가 아직 없습니다."}</div>
               )}
             </div>
           </div>
@@ -1619,13 +1805,21 @@ function EditorScreen({
 
         <aside className="editor-side-panel">
           <div className="part-tray" aria-label="해금 부품">
-            {layers.map((layer) => (
-              <button className={`tray-part ${selected?.id === layer.id ? "active" : ""}`} key={layer.id} onClick={() => onSelect(layer.id)} type="button">
+            {availableLayers.map((layer) => {
+              const placed = placedIds.has(layer.id);
+              return (
+              <button
+                className={`tray-part ${selected?.id === layer.id ? "active" : ""} ${placed ? "placed" : ""}`}
+                key={layer.id}
+                onClick={() => placed ? onSelect(layer.id) : onAddLayer(layer)}
+                type="button"
+              >
                 {layer.imageUrl ? <img src={layer.imageUrl} alt="" draggable={false} /> : <span />}
                 <b>{layer.label}</b>
-                <small>{modeLabel(layer.slot)}</small>
+                <small>{placed ? "사용 중" : "추가"}</small>
               </button>
-            ))}
+              );
+            })}
           </div>
 
           {selected ? (
@@ -1637,6 +1831,10 @@ function EditorScreen({
                 </div>
                 <em>{modeLabel(selected.slot)}</em>
               </div>
+              <button className="remove-part-btn" onClick={() => onRemoveLayer(selected.id)} type="button">
+                <Trash2 aria-hidden />
+                이 부품 빼기
+              </button>
               <label className="range-row">
                 <span>크기</span>
                 <input min="0.45" max="1.9" step="0.01" type="range" value={selected.scale} onChange={(event) => onSetLayer(selected.id, { scale: Number(event.target.value) })} />
@@ -1692,18 +1890,20 @@ function resultString(job: JobStatus | null, key: string): string | undefined {
 function PreviewScreen({
   destination,
   job,
+  savedPreview,
   onPrint,
   onEdit,
   onStory
 }: {
   destination: Destination;
   job: JobStatus | null;
+  savedPreview: SavedPreview | null;
   onPrint: () => void;
   onEdit: () => void;
   onStory: () => void;
 }) {
-  const conceptUrl = resultString(job, "concept_url");
-  const glbUrl = resultString(job, "glb_url");
+  const conceptUrl = resultString(job, "concept_url") || savedPreview?.conceptUrl;
+  const glbUrl = resultString(job, "glb_url") || savedPreview?.glbUrl || undefined;
 
   return (
     <div className="screen-section">

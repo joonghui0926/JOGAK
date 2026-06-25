@@ -187,6 +187,31 @@ button {
   font-size: 15px;
 }
 
+.select-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.select-row span {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.select-row select {
+  width: 100%;
+  height: 42px;
+  border: 1px solid rgba(17,17,17,.18);
+  background: rgba(255,255,255,.52);
+  color: var(--ink);
+  border-radius: 0;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 780;
+}
+
 .textarea {
   height: 84px;
   resize: none;
@@ -944,6 +969,11 @@ button {
   background: #fffdf7;
 }
 
+.tray-part.placed:not(.active) {
+  border-color: rgba(185,151,84,.42);
+  background: rgba(185,151,84,.08);
+}
+
 .tray-part img,
 .tray-part span {
   width: 48px;
@@ -1011,6 +1041,26 @@ button {
   font-size: 10px;
   font-weight: 850;
   white-space: nowrap;
+}
+
+.remove-part-btn {
+  width: 100%;
+  min-height: 36px;
+  margin: 0 0 10px;
+  border: 1px solid rgba(128,42,42,.24);
+  background: rgba(128,42,42,.055);
+  color: #5b2727;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 860;
+}
+
+.remove-part-btn svg {
+  width: 15px;
+  height: 15px;
 }
 
 .range-row {
