@@ -16,7 +16,6 @@ from jogak_api.services.editor_composition import build_editor_layout_notes, ren
 from jogak_api.services.jobs import update_job
 from jogak_api.services.hunyuan import generate_glb_from_image, gpu7_env
 from jogak_api.services.openai_images import build_pretravel_concept_prompt, build_refine_prompt, generate_concept_image
-from jogak_api.services.part_aware_3d import generate_part_aware_glb
 from jogak_api.services.public_data import build_public_data_prompt_context
 from jogak_api.services.storage import asset_url, sha256_file
 
@@ -233,24 +232,7 @@ def run_generation_job(job_id: str) -> None:
 
             update_job(db, job_id, state="hunyuan3d_pre", progress=58)
             glb_dir = settings.asset_storage_root / "glb" / job_id
-            if job.type == "hunyuan_final" and session and layer_rows:
-                character_path = pretravel_base_path(figurine) or concept_path
-
-                def report_part_progress(state: str, progress: int) -> None:
-                    update_job(db, job_id, state=state, progress=progress)
-
-                glb_path = generate_part_aware_glb(
-                    session=session,
-                    figurine=figurine,
-                    character_image_path=character_path,
-                    layers=layer_rows,
-                    part_map=part_map,
-                    output_path=glb_dir / "preview.glb",
-                    job_id=job_id,
-                    on_progress=report_part_progress,
-                )
-            else:
-                glb_path = generate_glb_from_image(image_path=concept_path, output_path=glb_dir / "preview.glb", job_id=job_id)
+            glb_path = generate_glb_from_image(image_path=concept_path, output_path=glb_dir / "preview.glb", job_id=job_id)
             db.add(
                 Asset(
                     figurine_id=figurine.id,

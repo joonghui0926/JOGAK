@@ -147,7 +147,15 @@ def generate_part_aware_glb(
     stage_height = float(composition.get("stage_height") or 288)
 
     character_glb = output_path.with_name("character_source.glb")
-    if not character_glb.exists() or character_glb.stat().st_size == 0:
+    character_checksum = sha256_file(character_image_path)
+    character_checksum_path = output_path.with_name("character_source.sha256")
+    cached_checksum = character_checksum_path.read_text(encoding="utf-8").strip() if character_checksum_path.exists() else ""
+    should_generate_character = (
+        not character_glb.exists()
+        or character_glb.stat().st_size == 0
+        or cached_checksum != character_checksum
+    )
+    if should_generate_character:
         if on_progress:
             on_progress("hunyuan_character", 60)
         generate_glb_from_image(
@@ -157,6 +165,7 @@ def generate_part_aware_glb(
             blender_postprocess=False,
             round_plinth=False,
         )
+        character_checksum_path.write_text(character_checksum, encoding="utf-8")
     if on_progress:
         on_progress("hunyuan_character_done", 68)
 

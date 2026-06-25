@@ -549,6 +549,14 @@ export default function JogakApp() {
 
   function openJobNotice() {
     if (!jobNotice) return;
+    const destinationId = resultString(jobNotice.job, "destination_id");
+    if (destinationId) {
+      const destination = allDestinations.find((item) => item.id === destinationId)
+        || destinations.find((item) => item.id === destinationId);
+      if (destination) {
+        setSelectedDestination(destination);
+      }
+    }
     setJob(jobNotice.job);
     setJobProgress(100);
     setJobNotice(null);
@@ -559,6 +567,14 @@ export default function JogakApp() {
     () => layers.find((layer) => layer.id === selectedLayer) || null,
     [layers, selectedLayer]
   );
+
+  const previewDestination = useMemo(() => {
+    const destinationId = resultString(job, "destination_id") || selectedDestination?.id;
+    if (!destinationId) return selectedDestination;
+    return allDestinations.find((item) => item.id === destinationId)
+      || destinations.find((item) => item.id === destinationId)
+      || selectedDestination;
+  }, [allDestinations, destinations, job, selectedDestination]);
 
   async function handleGuest() {
     try {
@@ -1013,14 +1029,20 @@ export default function JogakApp() {
               )}
 
               {screen === "preview" && (
-                selectedDestination ? (
+                previewDestination ? (
                   <PreviewScreen
-                    destination={selectedDestination}
+                    destination={previewDestination}
                     job={job}
-                    savedPreview={savedPreviews[selectedDestination.id] || null}
+                    savedPreview={savedPreviews[previewDestination.id] || null}
                     onPrint={() => setScreen("print")}
-                    onEdit={() => setScreen("editor")}
-                    onStory={() => openStory("preview")}
+                    onEdit={() => {
+                      setSelectedDestination(previewDestination);
+                      setScreen("editor");
+                    }}
+                    onStory={() => {
+                      setSelectedDestination(previewDestination);
+                      openStory("preview");
+                    }}
                   />
                 ) : (
                   <DestinationRequired onExplore={() => setScreen("explore")} />

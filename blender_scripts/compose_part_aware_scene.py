@@ -53,6 +53,20 @@ def make_image_mat(name: str, image_path: Path) -> bpy.types.Material:
     return mat
 
 
+def image_card_is_ground(spec: dict) -> bool:
+    slot = str(spec.get("slot") or "").lower()
+    name = str(spec.get("name") or "").lower()
+    mode = str(spec.get("integration_mode") or "").lower()
+    if slot in {"pattern", "texture"}:
+        return True
+    ground_markers = ("받침", "바닥", "문양", "floor", "ground", "plinth", "pattern", "decal")
+    if slot == "base" and any(marker in name for marker in ground_markers):
+        return True
+    if mode == "base_attach" and any(marker in name for marker in ground_markers):
+        return True
+    return False
+
+
 def add_image_card(spec: dict) -> list[bpy.types.Object]:
     image_path = Path(str(spec.get("image_path") or ""))
     if not image_path.exists():
@@ -70,7 +84,7 @@ def add_image_card(spec: dict) -> list[bpy.types.Object]:
     else:
         obj.scale.x = 1.0
         obj.scale.y = 1.0 / aspect
-    if spec.get("integration_mode") != "base_attach":
+    if not image_card_is_ground(spec):
         obj.rotation_euler[0] = math.radians(90)
     obj.data.materials.append(make_image_mat(f"preserved visual {spec.get('part_id', 'part')}", image_path))
     solid = obj.modifiers.new("thin printable card", "SOLIDIFY")
