@@ -257,16 +257,50 @@ export default function JogakApp() {
   useEffect(() => {
     if (!selectedDestination) {
       setPartAssets([]);
+      setUnlockedParts([]);
+      setLayers([]);
+      setSelectedLayer("");
+      setEditorSessionId(null);
       setCultureData(null);
       return;
     }
+    let cancelled = false;
+    setPartAssets([]);
+    setUnlockedParts([]);
+    setLayers([]);
+    setSelectedLayer("");
+    setEditorSessionId(null);
+    setCultureData(null);
+
     fetchDestinationParts(selectedDestination.id)
-      .then(setPartAssets)
-      .catch(() => setPartAssets([]));
+      .then((parts) => {
+        if (cancelled) return;
+        setPartAssets(parts);
+        const availableIds = initialUnlockedPartIds(parts, userEmail);
+        setUnlockedParts(availableIds);
+        const nextLayers = buildUnlockedLayers(parts, availableIds);
+        setLayers(nextLayers);
+        setSelectedLayer(nextLayers[0]?.id || "");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPartAssets([]);
+        setUnlockedParts([]);
+        setLayers([]);
+        setSelectedLayer("");
+      });
     fetchDestinationCulture(selectedDestination.id)
-      .then(setCultureData)
-      .catch(() => setCultureData(null));
-  }, [selectedDestination?.id]);
+      .then((nextCulture) => {
+        if (!cancelled) setCultureData(nextCulture);
+      })
+      .catch(() => {
+        if (!cancelled) setCultureData(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDestination?.id, userEmail]);
 
   useEffect(() => {
     if (!job?.id || ["done", "failed"].includes(job.status)) return;
@@ -2014,7 +2048,7 @@ function cleanSourceSummary(value?: string | null) {
 }
 
 function displaySourceTitle(source: PublicDataSource) {
-  return stripPartSuffix(cleanPublicField(source.title) || source.title || "문화유산 요소");
+  return stripPartSuffix(cleanPublicField(source.title) || "문화유산 요소");
 }
 
 function displayProvider(source: PublicDataSource) {
@@ -2137,6 +2171,13 @@ function modeLabel(slot: string) {
   if (slot === "base" || slot === "pattern" || slot === "texture") return "원판/베이스";
   if (slot === "back_prop") return "뒤쪽 배경";
   return "자유 배치";
+}
+
+function initialUnlockedPartIds(parts: PartAsset[], email: string) {
+  if (email.trim().toLowerCase() === REVIEW_UNLOCK_EMAIL) {
+    return parts.map((part) => part.id);
+  }
+  return parts.filter((part) => part.unlocked).map((part) => part.id);
 }
 
 function buildUnlockedLayers(parts: PartAsset[], unlockedIds: string[]): EditorLayer[] {
