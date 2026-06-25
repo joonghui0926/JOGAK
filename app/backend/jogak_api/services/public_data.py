@@ -26,12 +26,14 @@ TOURAPI_DATASET_ID = "15101578"
 EMUSEUM_DATASET_ID = "15104964"
 EXHIBITION_DATASET_ID = "15105220"
 PATTERN_DATASET_ID = "15138934"
+LOCAL_FALLBACK_DATASET_ID = "jogak-local-fallback"
 
 DATASET_URLS = {
     TOURAPI_DATASET_ID: "https://www.data.go.kr/data/15101578/openapi.do",
     EMUSEUM_DATASET_ID: "https://www.data.go.kr/data/15104964/openapi.do",
     EXHIBITION_DATASET_ID: "https://www.data.go.kr/data/15105220/openapi.do",
     PATTERN_DATASET_ID: "https://www.data.go.kr/data/15138934/openapi.do",
+    LOCAL_FALLBACK_DATASET_ID: "https://www.data.go.kr/",
 }
 
 TITLE_KEYS = (
@@ -53,6 +55,7 @@ TITLE_KEYS = (
 ID_KEYS = (
     "contentid",
     "contentId",
+    "external_id",
     "id",
     "identifier",
     "resourceId",
@@ -128,6 +131,13 @@ def public_data_sync_plan() -> dict:
                 "dataset_id": PATTERN_DATASET_ID,
                 "configured": bool(pattern_key and settings.culture_pattern_api_url),
                 "uses": ["period-correct motif", "material and pattern constraints"],
+            },
+            {
+                "name": "JOGAK 로컬 공공데이터 보강 카탈로그",
+                "dataset_id": LOCAL_FALLBACK_DATASET_ID,
+                "configured": settings.local_public_data_file.is_file(),
+                "uses": ["blocked API fallback", "part provenance", "prompt constraints"],
+                "fallback": "local file" if settings.local_public_data_file.is_file() else None,
             },
         ],
     }
@@ -325,19 +335,33 @@ def _tourapi_search(destination: Destination) -> list[dict[str, Any]]:
     api_key = _data_go_kr_key()
     if not api_key:
         return []
-    payload = _request(
-        f"{settings.tourapi_base_url.rstrip('/')}/searchKeyword2",
-        api_key=api_key,
-        keyword=destination.name,
-        timeout=settings.public_data_timeout_seconds,
-        extra_params={
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for content_type_id in (None,):
+        extra_params: dict[str, Any] = {
             "MobileOS": "ETC",
             "MobileApp": "JOGAK",
             "arrange": "O",
-            "contentTypeId": 12,
-        },
-    )
-    return _candidate_items(payload)
+        }
+        if content_type_id is not None:
+            extra_params["contentTypeId"] = content_type_id
+        payload = _request(
+            f"{settings.tourapi_base_url.rstrip('/')}/searchKeyword2",
+            api_key=api_key,
+            keyword=destination.name,
+            timeout=settings.public_data_timeout_seconds,
+            extra_params=extra_params,
+        )
+        candidate_items = _candidate_items(payload)
+        for item in candidate_items:
+            stable_key = _first(item, ID_KEYS) or json.dumps(item, ensure_ascii=False, sort_keys=True, default=str)
+            if stable_key in seen:
+                continue
+            seen.add(stable_key)
+            items.append(item)
+        if any((_first(item, TITLE_KEYS) or "").strip() == destination.name.strip() for item in candidate_items):
+            break
+    return items
 
 
 def _culture_search(url: str | None, api_key: str | None, keyword: str) -> list[dict[str, Any]]:
@@ -395,6 +419,53 @@ def _load_local_exhibition_items(destination: Destination) -> list[dict[str, Any
     return filtered
 
 
+def _load_local_fallback_items(destination: Destination) -> list[dict[str, Any]]:
+    settings = get_settings()
+    path = settings.local_public_data_file
+    if not path.is_file():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    records = payload.get("records", []) if isinstance(payload, dict) else payload
+    return [
+        item
+        for item in records
+        if isinstance(item, dict) and item.get("destination_id") == destination.id
+    ]
+
+
+def _local_fallback_values(item: dict[str, Any], destination_id: str) -> dict[str, Any] | None:
+    title = _text(item.get("title"))
+    if not title:
+        return None
+    raw = json.loads(json.dumps(item, ensure_ascii=False, default=str))
+    source_url = _text(item.get("source_url")) or DATASET_URLS[LOCAL_FALLBACK_DATASET_ID]
+    image_url = _text(item.get("image_url"))
+    if image_url and not image_url.startswith(("http://", "https://")):
+        image_url = None
+    return {
+        "destination_id": destination_id,
+        "provider": "JOGAK 로컬 공공데이터 보강",
+        "dataset_id": LOCAL_FALLBACK_DATASET_ID,
+        "external_id": _text(item.get("external_id")) or _stable_external_id(item, title),
+        "record_type": _text(item.get("record_type")) or "heritage",
+        "title": title[:300],
+        "summary": _text(item.get("summary")),
+        "period": _text(item.get("period")),
+        "material": _text(item.get("material")),
+        "institution": _text(item.get("institution")),
+        "image_url": image_url,
+        "source_url": source_url,
+        "license_note": _text(item.get("license_note")),
+        "starts_at": _parse_datetime(_text(item.get("starts_at"))),
+        "ends_at": _parse_datetime(_text(item.get("ends_at")), end=True),
+        "raw_json": raw,
+        "fetched_at": datetime.now(timezone.utc),
+        "checksum": hashlib.sha256(
+            json.dumps(raw, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest(),
+    }
+
+
 def _upsert_record(db: Session, values: dict[str, Any]) -> PublicDataRecord:
     record = (
         db.query(PublicDataRecord)
@@ -440,6 +511,19 @@ def _match_score(part_name: str, record: PublicDataRecord) -> float:
     return min(overlap, 1.0)
 
 
+def _destination_match_score(destination: Destination, record: PublicDataRecord) -> float:
+    title = record.title.strip()
+    destination_name = destination.name.strip()
+    score = _match_score(destination_name, record)
+    if title == destination_name:
+        score += 2.0
+    elif title.startswith(destination_name):
+        score += 0.75
+    if _first(record.raw_json or {}, ("contenttypeid", "contentTypeId")) == "14":
+        score += 0.2
+    return score
+
+
 def _link_part(
     db: Session,
     *,
@@ -447,6 +531,8 @@ def _link_part(
     record: PublicDataRecord,
     relation_type: str,
     score: float,
+    verified: bool = False,
+    prompt_constraints: dict[str, Any] | None = None,
 ) -> None:
     link = (
         db.query(PartPublicDataLink)
@@ -464,6 +550,7 @@ def _link_part(
             relation_type=relation_type,
         )
     link.match_score = score
+    link.verified = verified
     link.prompt_constraints_json = {
         key: value
         for key, value in {
@@ -471,6 +558,7 @@ def _link_part(
             "period": record.period,
             "material": record.material,
             "institution": record.institution,
+            **(prompt_constraints or {}),
         }.items()
         if value
     }
@@ -484,6 +572,50 @@ def _best_records(part: PartAsset, records: list[PublicDataRecord], limit: int =
         reverse=True,
     )
     return [(record, score) for record, score in scored[:limit] if score >= 0.45]
+
+
+def _sync_local_fallback(db: Session, destination: Destination) -> int:
+    items = _load_local_fallback_items(destination)
+    if not items:
+        return 0
+    parts = sorted(destination.parts, key=lambda part: (part.slot, part.name))
+    parts_by_name = {part.name: part for part in destination.parts}
+    parts_by_slot = {}
+    for part in destination.parts:
+        parts_by_slot.setdefault(part.slot, []).append(part)
+
+    count = 0
+    for item in items:
+        values = _local_fallback_values(item, destination.id)
+        if not values:
+            continue
+        record = _upsert_record(db, values)
+        count += 1
+        if record.record_type == "destination":
+            continue
+
+        part = parts_by_name.get(record.title)
+        slot = _text(item.get("slot"))
+        part_index = item.get("part_index")
+        if part is None and slot and slot in parts_by_slot:
+            slot_parts = sorted(parts_by_slot[slot], key=lambda candidate: candidate.name)
+            if slot_parts:
+                part = slot_parts[0]
+        if part is None and isinstance(part_index, int) and 1 <= part_index <= len(parts):
+            part = parts[part_index - 1]
+        if part is None:
+            continue
+
+        _link_part(
+            db,
+            part=part,
+            record=record,
+            relation_type=_text(item.get("relation_type")) or "fallback_reference",
+            score=0.72,
+            verified=bool(item.get("verified")),
+            prompt_constraints=item.get("prompt_constraints") if isinstance(item.get("prompt_constraints"), dict) else None,
+        )
+    return count
 
 
 def sync_destination_public_data(db: Session, destination_id: str) -> dict:
@@ -509,7 +641,7 @@ def sync_destination_public_data(db: Session, destination_id: str) -> dict:
                 tour_records.append(_upsert_record(db, values))
         best_destination = max(
             tour_records,
-            key=lambda record: _match_score(destination.name, record),
+            key=lambda record: _destination_match_score(destination, record),
             default=None,
         )
         if best_destination:
@@ -592,13 +724,21 @@ def sync_destination_public_data(db: Session, destination_id: str) -> dict:
     report["sources"]["pattern"] = len({record.id for record in pattern_records})
 
     try:
-        exhibition_items = _culture_search(
-            settings.culture_exhibition_api_url,
-            _culture_data_key(),
-            destination.name,
-        )
-        if not exhibition_items:
-            exhibition_items = _load_local_exhibition_items(destination)
+        exhibition_items: list[dict[str, Any]] = _load_local_exhibition_items(destination)
+        if (
+            not exhibition_items
+            and not _has_local_exhibition_file(settings.public_data_exhibition_file)
+            and settings.culture_exhibition_api_url
+            and _culture_data_key()
+        ):
+            try:
+                exhibition_items = _culture_search(
+                    settings.culture_exhibition_api_url,
+                    _culture_data_key(),
+                    destination.name,
+                )
+            except Exception as exc:
+                report["errors"].append({"source": "exhibition_api", "message": str(exc)})
         exhibition_records = []
         for item in exhibition_items:
             values = _normalize_record(
@@ -630,6 +770,11 @@ def sync_destination_public_data(db: Session, destination_id: str) -> dict:
         report["sources"]["exhibition"] = len(exhibition_records)
     except Exception as exc:
         report["errors"].append({"source": "exhibition", "message": str(exc)})
+
+    try:
+        report["sources"]["local_fallback"] = _sync_local_fallback(db, destination)
+    except Exception as exc:
+        report["errors"].append({"source": "local_fallback", "message": str(exc)})
 
     linked_records = (
         db.query(PublicDataRecord)

@@ -30,6 +30,7 @@ data/assets/print/*
 data/assets/uploads/*
 data/jobs/*
 data/logs/*
+data/reports/*
 data/assets/split_pipeline/*
 !data/assets/split_pipeline/split_nmok_general_components_001/
 !data/assets/split_pipeline/split_nmok_general_components_001/**

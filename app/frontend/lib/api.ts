@@ -51,7 +51,12 @@ export async function createGuestSession() {
 }
 
 export async function startEmailLogin(email: string) {
-  return apiFetch<{ ok: boolean; message: string }>("/auth/email/start", {
+  return apiFetch<{
+    ok: boolean;
+    message: string;
+    access_token?: string;
+    user?: { id: string; display_name: string; is_guest: boolean };
+  }>("/auth/email/start", {
     method: "POST",
     body: JSON.stringify({ email })
   });

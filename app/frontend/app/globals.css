@@ -350,6 +350,14 @@ button {
   gap: 12px;
 }
 
+.unlock-progress {
+  margin-top: 22px;
+}
+
+.profile-actions {
+  margin-top: 22px;
+}
+
 .action-row,
 .step {
   width: 100%;

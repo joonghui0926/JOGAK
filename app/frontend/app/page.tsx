@@ -244,6 +244,12 @@ export default function JogakApp() {
     }
     try {
       const result = await startEmailLogin(email.trim());
+      if (result.access_token && result.user) {
+        setAuthToken(result.access_token);
+        window.localStorage.setItem("jogak_user_name", result.user.display_name);
+        setUserName(result.user.display_name);
+        setScreen("home");
+      }
       setLoginNotice(result.message);
     } catch {
       setLoginNotice("백엔드 연결 전에는 게스트로 먼저 둘러볼 수 있습니다.");
@@ -1087,7 +1093,7 @@ function UnlockScreen({
           loading="lazy"
         />
       </div>
-      <div className="progress-list">
+      <div className="progress-list unlock-progress">
         <Step done title="장소 좌표 준비" text={`${destination.name} geofence 반경 ${destination.radius_m}m`} tag="확인" />
         <Step done={unlockedParts.length > 0} now={unlockedParts.length === 0} title="GPS 방문 확인" text="위치 정확도와 체류 시간을 함께 저장합니다." tag={unlockedParts.length ? "완료" : "진행"} />
         <Step done={unlockedParts.length > 0} title="부품 해금" text={`${destination.parts.length}개 부품으로 조각 생성 가능`} tag="대기" />
@@ -1120,7 +1126,7 @@ function CustomizeScreen({ style, onStyle, onEditor }: { style: string; onStyle:
         ))}
       </div>
       <div className="label">스타일</div>
-      <div className="action-list">
+      <div className="action-list profile-actions">
         <ActionRow icon={<Move />} title="드래그 배치" text="원하는 위치로 옮기면 최종 3D 조립 좌표로 저장됩니다." tag="LAYOUT" />
         <ActionRow icon={<RotateCw />} title="회전과 크기" text="부품 모양은 유지하고, 방향과 비율만 조절합니다." tag="PART" />
         <ActionRow icon={<PackageCheck />} title="출력 안정형" text="베이스, 건물, 손소품, 머리장식을 각기 다른 규칙으로 조립합니다." tag="3D" />

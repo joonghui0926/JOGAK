@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     culture_exhibition_api_url: str | None = None
     culture_pattern_api_url: str | None = None
     public_data_exhibition_file: Path = Path("/SSD/guest/chojoonghui/JOGAK/data/public/exhibitions")
+    local_public_data_file: Path = Path("/SSD/guest/chojoonghui/JOGAK/data/public/local_public_data_fallback.json")
     public_data_timeout_seconds: float = 20.0
 
     cuda_visible_devices: str = "7"
