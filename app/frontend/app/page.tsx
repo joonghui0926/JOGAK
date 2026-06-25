@@ -99,6 +99,7 @@ const screenTitles: Partial<Record<Screen, string>> = {
 
 export default function JogakApp() {
   const [screen, setScreen] = useState<Screen>("login");
+  const [storyReturnScreen, setStoryReturnScreen] = useState<Screen>("destination");
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [query, setQuery] = useState("");
@@ -513,6 +514,11 @@ export default function JogakApp() {
     );
   }
 
+  function openStory(from: Screen) {
+    setStoryReturnScreen(from);
+    setScreen("story");
+  }
+
   const showTabs = screen !== "login";
 
   return (
@@ -568,6 +574,7 @@ export default function JogakApp() {
                     onBack={() => setScreen("explore")}
                     onMaker={() => setScreen("maker")}
                     onParts={() => setScreen("parts")}
+                    onStory={() => openStory("destination")}
                     onRoute={() => openRoute(selectedDestination)}
                   />
                 ) : (
@@ -587,6 +594,7 @@ export default function JogakApp() {
                     onStyle={setStyle}
                     onBack={() => setScreen("destination")}
                     onGenerate={handleGenerate}
+                    onStory={() => openStory("maker")}
                   />
                 ) : (
                   <DestinationRequired onExplore={() => setScreen("explore")} />
@@ -653,7 +661,7 @@ export default function JogakApp() {
 
               {screen === "preview" && (
                 selectedDestination ? (
-                  <PreviewScreen destination={selectedDestination} job={job} onPrint={() => setScreen("print")} onEdit={() => setScreen("editor")} onStory={() => setScreen("story")} />
+                  <PreviewScreen destination={selectedDestination} job={job} onPrint={() => setScreen("print")} onEdit={() => setScreen("editor")} onStory={() => openStory("preview")} />
                 ) : (
                   <DestinationRequired onExplore={() => setScreen("explore")} />
                 )
@@ -665,7 +673,7 @@ export default function JogakApp() {
                     destination={selectedDestination}
                     cultureData={cultureData}
                     parts={partAssets}
-                    onBack={() => setScreen("preview")}
+                    onBack={() => setScreen(storyReturnScreen)}
                   />
                 ) : <DestinationRequired onExplore={() => setScreen("explore")} />
               )}
@@ -872,6 +880,7 @@ function DestinationScreen({
   onBack,
   onMaker,
   onParts,
+  onStory,
   onRoute
 }: {
   destination: Destination;
@@ -879,6 +888,7 @@ function DestinationScreen({
   onBack: () => void;
   onMaker: () => void;
   onParts: () => void;
+  onStory: () => void;
   onRoute: () => void;
 }) {
   return (
@@ -907,7 +917,7 @@ function DestinationScreen({
       </div>
       <div className="label">이곳에서 만나는 것</div>
       <div className="action-list">
-        <ActionRow icon={<BookOpen />} title="대표 이야기" text={destination.dna} tag="STORY" />
+        <ActionRow icon={<BookOpen />} title="대표 이야기" text={destination.dna} tag="STORY" onClick={onStory} />
         <ActionRow
           icon={<ImageIcon />}
           title="공공데이터 자료"
@@ -947,7 +957,8 @@ function MakerScreen({
   onPrompt,
   onStyle,
   onBack,
-  onGenerate
+  onGenerate,
+  onStory
 }: {
   destination: Destination;
   prompt: string;
@@ -958,6 +969,7 @@ function MakerScreen({
   onStyle: (value: string) => void;
   onBack: () => void;
   onGenerate: () => void;
+  onStory: () => void;
 }) {
   return (
     <div className="screen-section">
@@ -1009,7 +1021,7 @@ function MakerScreen({
           <WandSparkles aria-hidden />
           방문 전 조각 생성
         </button>
-        <button className="secondary" type="button">
+        <button className="secondary" onClick={onStory} type="button">
           <BookOpen aria-hidden />
           관광지 이야기 더 보기
         </button>
@@ -1507,14 +1519,14 @@ function StoryScreen({
       <div className="screen-heading">
         <button className="icon-text" onClick={onBack} type="button">
           <ChevronLeft aria-hidden />
-          조각
+          돌아가기
         </button>
         <button className="icon-text" type="button">
           <Flag aria-hidden />
           신고
         </button>
       </div>
-      <h1 className="title-tight">이 조각에 담긴 이야기</h1>
+      <h1 className="title-tight">{destination.name} 이야기</h1>
       <div className="action-list">
         <ActionRow icon={<Gem />} title="문화 DNA" text={destination.dna} tag="DNA" />
         <ActionRow
