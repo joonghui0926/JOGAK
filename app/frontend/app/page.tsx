@@ -122,6 +122,31 @@ export default function JogakApp() {
   const stageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    const storedName = window.localStorage.getItem("jogak_user_name");
+    const storedToken = window.localStorage.getItem("jogak_access_token");
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const oauthToken = params.get("auth_token");
+    const oauthName = params.get("user_name");
+
+    if (oauthToken) {
+      setAuthToken(oauthToken);
+      if (oauthName) {
+        window.localStorage.setItem("jogak_user_name", oauthName);
+        setUserName(oauthName);
+      }
+      setLoginNotice("");
+      setScreen("home");
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      return;
+    }
+
+    if (storedToken) {
+      setUserName(storedName || "Google 사용자");
+      setScreen("home");
+    }
+  }, []);
+
+  useEffect(() => {
     fetchDestinations(query)
       .then((items) => {
         setDestinations(items);
@@ -204,6 +229,7 @@ export default function JogakApp() {
     try {
       const session = await createGuestSession();
       setAuthToken(session.access_token);
+      window.localStorage.setItem("jogak_user_name", session.user.display_name);
       setUserName(session.user.display_name);
     } catch {
       setUserName("게스트 여행자");

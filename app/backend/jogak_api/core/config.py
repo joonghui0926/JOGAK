@@ -27,9 +27,11 @@ class Settings(BaseSettings):
 
     google_client_id: str | None = None
     google_client_secret: str | None = None
+    google_redirect_uri: str | None = None
     kakao_client_id: str | None = None
     kakao_client_secret: str | None = None
     kakao_redirect_uri: str | None = None
+    frontend_app_url: str = "http://localhost:3000"
 
     asset_base_url: AnyHttpUrl | str = "http://localhost:8000/assets"
     asset_storage_root: Path = Path("/SSD/guest/chojoonghui/JOGAK/data/assets")
