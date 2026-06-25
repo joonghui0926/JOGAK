@@ -1294,128 +1294,134 @@ function EditorScreen({
       </div>
       <p className="desc">위치, 크기, 회전, 앞뒤 순서가 최종 3D 조립 좌표로 저장됩니다.</p>
 
-      <div className="edit-stage-shell">
-        <div className="edit-stage" ref={stageRef} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
-          {basePreviewUrl ? (
-            <img className="editor-base-preview" src={basePreviewUrl} alt="" draggable={false} />
+      <div className="editor-layout">
+        <section className="editor-canvas-panel" aria-label="부품 배치 작업대">
+          <div className="edit-stage-shell">
+            <div className="edit-stage" ref={stageRef} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
+              {basePreviewUrl ? (
+                <img className="editor-base-preview" src={basePreviewUrl} alt="" draggable={false} />
+              ) : (
+                <div className="editor-base-placeholder">
+                  <ImageIcon aria-hidden />
+                  <span>방문 전 프리뷰가 여기에 놓입니다</span>
+                </div>
+              )}
+              <div className="stage-safe-area" aria-hidden />
+              {layers.length ? (
+                layers
+                  .slice()
+                  .sort((a, b) => a.z - b.z)
+                  .map((layer) => {
+                    const size = layerSize(layer.slot);
+                    return (
+                      <button
+                        className={`layer layer-${layer.slot} ${selected?.id === layer.id ? "selected" : ""}`}
+                        key={layer.id}
+                        style={{
+                          left: layer.x,
+                          top: layer.y,
+                          width: size.width,
+                          height: size.height,
+                          transform: `rotate(${layer.rotation}deg) scale(${layer.scale})`,
+                          zIndex: layer.z,
+                          backgroundColor: layer.imageUrl ? "transparent" : layer.color
+                        }}
+                        onPointerDown={(event) => onLayerPointerDown(event, layer)}
+                        onClick={() => onSelect(layer.id)}
+                        type="button"
+                        aria-label={layer.label}
+                      >
+                        {layer.imageUrl && <img src={layer.imageUrl} alt="" draggable={false} />}
+                      </button>
+                    );
+                  })
+              ) : (
+                <div className="empty-stage">해금된 2D 부품 이미지가 아직 없습니다.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="editor-toolbar" aria-label="편집 도구">
+            <button className="tool-btn active" type="button" title="드래그">
+              <Move aria-hidden />
+            </button>
+            <button className="tool-btn" onClick={() => onAdjust({ rotation: -8 })} type="button" title="왼쪽 회전">
+              <RotateCcw aria-hidden />
+            </button>
+            <button className="tool-btn" onClick={() => onAdjust({ rotation: 8 })} type="button" title="오른쪽 회전">
+              <RotateCw aria-hidden />
+            </button>
+            <button className="tool-btn" onClick={() => onAdjust({ scale: 0.08 })} type="button" title="크게">
+              <Maximize2 aria-hidden />
+            </button>
+            <button className="tool-btn" onClick={onReset} type="button" title="위치 초기화">
+              <Undo2 aria-hidden />
+            </button>
+          </div>
+        </section>
+
+        <aside className="editor-side-panel">
+          <div className="part-tray" aria-label="해금 부품">
+            {layers.map((layer) => (
+              <button className={`tray-part ${selected?.id === layer.id ? "active" : ""}`} key={layer.id} onClick={() => onSelect(layer.id)} type="button">
+                {layer.imageUrl ? <img src={layer.imageUrl} alt="" draggable={false} /> : <span />}
+                <b>{layer.label}</b>
+                <small>{modeLabel(layer.slot)}</small>
+              </button>
+            ))}
+          </div>
+
+          {selected ? (
+            <div className="selected-editor">
+              <div className="selected-head">
+                <div>
+                  <span>선택된 부품</span>
+                  <strong>{selected.label}</strong>
+                </div>
+                <em>{modeLabel(selected.slot)}</em>
+              </div>
+              <label className="range-row">
+                <span>크기</span>
+                <input min="0.45" max="1.9" step="0.01" type="range" value={selected.scale} onChange={(event) => onSetLayer(selected.id, { scale: Number(event.target.value) })} />
+                <b>{Math.round(selected.scale * 100)}%</b>
+              </label>
+              <label className="range-row">
+                <span>회전</span>
+                <input min="-60" max="60" step="1" type="range" value={selected.rotation} onChange={(event) => onSetLayer(selected.id, { rotation: Number(event.target.value) })} />
+                <b>{Math.round(selected.rotation)}°</b>
+              </label>
+              <div className="nudge-grid">
+                <button className="secondary-mini" onClick={() => onAdjust({ z: -1 })} type="button">뒤로</button>
+                <button className="secondary-mini" onClick={() => onAdjust({ z: 1 })} type="button">앞으로</button>
+                <button className="secondary-mini" onClick={() => onAdjust({ scale: -0.06 })} type="button">작게</button>
+                <button className="secondary-mini" onClick={() => onAdjust({ scale: 0.06 })} type="button">크게</button>
+              </div>
+              <p className="data-note">{selectedSize.width}×{selectedSize.height} 작업대 단위 · 이 배치는 Blender 조립 manifest에 그대로 저장됩니다.</p>
+            </div>
           ) : (
-            <div className="editor-base-placeholder">
+            <div className="selected-editor empty-selection">
+              <b>부품을 선택해 주세요</b>
+              <span>아래 부품 트레이나 작업대 위 이미지를 누르면 세부 조절이 열립니다.</span>
+            </div>
+          )}
+
+          <div className="pipeline-note">
+            <Step done title="2D 배치" text="사용자가 놓은 위치, 크기, 회전, 앞뒤 순서를 저장합니다." tag="NOW" />
+            <Step title="자연 배치 이미지" text="부품 모양은 유지하고 착용/손/배경 관계를 정리합니다." tag="2D" />
+            <Step title="부품별 3D 조립" text="Hunyuan과 Blender가 발 접지와 베이스를 맞춥니다." tag="3D" />
+          </div>
+
+          <div className="button-stack">
+            <button className="primary" onClick={onComplete} type="button">
+              <Check aria-hidden />
+              최종 3D 만들기
+            </button>
+            <button className="secondary" onClick={onRefine} type="button">
               <ImageIcon aria-hidden />
-              <span>방문 전 프리뷰가 여기에 놓입니다</span>
-            </div>
-          )}
-          <div className="stage-safe-area" aria-hidden />
-          {layers.length ? (
-            layers
-              .slice()
-              .sort((a, b) => a.z - b.z)
-              .map((layer) => {
-                const size = layerSize(layer.slot);
-                return (
-                  <button
-                    className={`layer layer-${layer.slot} ${selected?.id === layer.id ? "selected" : ""}`}
-                    key={layer.id}
-                    style={{
-                      left: layer.x,
-                      top: layer.y,
-                      width: size.width,
-                      height: size.height,
-                      transform: `rotate(${layer.rotation}deg) scale(${layer.scale})`,
-                      zIndex: layer.z,
-                      backgroundColor: layer.imageUrl ? "transparent" : layer.color
-                    }}
-                    onPointerDown={(event) => onLayerPointerDown(event, layer)}
-                    onClick={() => onSelect(layer.id)}
-                    type="button"
-                    aria-label={layer.label}
-                  >
-                    {layer.imageUrl && <img src={layer.imageUrl} alt="" draggable={false} />}
-                  </button>
-                );
-              })
-          ) : (
-            <div className="empty-stage">해금된 2D 부품 이미지가 아직 없습니다.</div>
-          )}
-        </div>
-      </div>
-
-      <div className="editor-toolbar" aria-label="편집 도구">
-        <button className="tool-btn active" type="button" title="드래그">
-          <Move aria-hidden />
-        </button>
-        <button className="tool-btn" onClick={() => onAdjust({ rotation: -8 })} type="button" title="왼쪽 회전">
-          <RotateCcw aria-hidden />
-        </button>
-        <button className="tool-btn" onClick={() => onAdjust({ rotation: 8 })} type="button" title="오른쪽 회전">
-          <RotateCw aria-hidden />
-        </button>
-        <button className="tool-btn" onClick={() => onAdjust({ scale: 0.08 })} type="button" title="크게">
-          <Maximize2 aria-hidden />
-        </button>
-        <button className="tool-btn" onClick={onReset} type="button" title="위치 초기화">
-          <Undo2 aria-hidden />
-        </button>
-      </div>
-
-      <div className="part-tray" aria-label="해금 부품">
-        {layers.map((layer) => (
-          <button className={`tray-part ${selected?.id === layer.id ? "active" : ""}`} key={layer.id} onClick={() => onSelect(layer.id)} type="button">
-            {layer.imageUrl ? <img src={layer.imageUrl} alt="" draggable={false} /> : <span />}
-            <b>{layer.label}</b>
-            <small>{modeLabel(layer.slot)}</small>
-          </button>
-        ))}
-      </div>
-
-      {selected ? (
-        <div className="selected-editor">
-          <div className="selected-head">
-            <div>
-              <span>선택된 부품</span>
-              <strong>{selected.label}</strong>
-            </div>
-            <em>{modeLabel(selected.slot)}</em>
+              자연 배치 2D만 먼저 보기
+            </button>
           </div>
-          <label className="range-row">
-            <span>크기</span>
-            <input min="0.45" max="1.9" step="0.01" type="range" value={selected.scale} onChange={(event) => onSetLayer(selected.id, { scale: Number(event.target.value) })} />
-            <b>{Math.round(selected.scale * 100)}%</b>
-          </label>
-          <label className="range-row">
-            <span>회전</span>
-            <input min="-60" max="60" step="1" type="range" value={selected.rotation} onChange={(event) => onSetLayer(selected.id, { rotation: Number(event.target.value) })} />
-            <b>{Math.round(selected.rotation)}°</b>
-          </label>
-          <div className="nudge-grid">
-            <button className="secondary-mini" onClick={() => onAdjust({ z: -1 })} type="button">뒤로</button>
-            <button className="secondary-mini" onClick={() => onAdjust({ z: 1 })} type="button">앞으로</button>
-            <button className="secondary-mini" onClick={() => onAdjust({ scale: -0.06 })} type="button">작게</button>
-            <button className="secondary-mini" onClick={() => onAdjust({ scale: 0.06 })} type="button">크게</button>
-          </div>
-          <p className="data-note">{selectedSize.width}×{selectedSize.height} 작업대 단위 · 이 배치는 Blender 조립 manifest에 그대로 저장됩니다.</p>
-        </div>
-      ) : (
-        <div className="selected-editor empty-selection">
-          <b>부품을 선택해 주세요</b>
-          <span>아래 부품 트레이나 작업대 위 이미지를 누르면 세부 조절이 열립니다.</span>
-        </div>
-      )}
-
-      <div className="pipeline-note">
-        <Step done title="2D 배치" text="사용자가 놓은 위치, 크기, 회전, 앞뒤 순서를 저장합니다." tag="NOW" />
-        <Step title="자연 배치 이미지" text="부품 모양은 유지하고 착용/손/배경 관계를 정리합니다." tag="2D" />
-        <Step title="부품별 3D 조립" text="Hunyuan과 Blender가 발 접지와 베이스를 맞춥니다." tag="3D" />
-      </div>
-
-      <div className="button-stack">
-        <button className="primary" onClick={onComplete} type="button">
-          <Check aria-hidden />
-          최종 3D 만들기
-        </button>
-        <button className="secondary" onClick={onRefine} type="button">
-          <ImageIcon aria-hidden />
-          자연 배치 2D만 먼저 보기
-        </button>
+        </aside>
       </div>
     </div>
   );
