@@ -3,7 +3,12 @@ from sqlalchemy import or_
 
 from jogak_api.deps import CurrentUser, DBSession
 from jogak_api.db.models import Destination, PartAsset, Unlock
-from jogak_api.schemas import DestinationRead, PartAssetRead
+from jogak_api.schemas import DestinationCultureRead, DestinationRead, PartAssetRead
+from jogak_api.services.public_data import (
+    destination_culture_payload,
+    part_limited_status,
+    part_public_sources,
+)
 from jogak_api.services.storage import asset_url
 
 router = APIRouter(prefix="/api/destinations", tags=["destinations"])
@@ -45,6 +50,14 @@ def get_destination(destination_id: str, db: DBSession) -> DestinationRead:
     return destination_to_read(destination)
 
 
+@router.get("/{destination_id}/culture", response_model=DestinationCultureRead)
+def get_destination_culture(destination_id: str, db: DBSession) -> DestinationCultureRead:
+    destination = db.get(Destination, destination_id)
+    if destination is None:
+        raise HTTPException(status_code=404, detail="Destination not found")
+    return DestinationCultureRead.model_validate(destination_culture_payload(db, destination))
+
+
 @router.get("/{destination_id}/parts", response_model=list[PartAssetRead])
 def list_parts(destination_id: str, db: DBSession, user: CurrentUser) -> list[PartAssetRead]:
     destination = db.get(Destination, destination_id)
@@ -58,12 +71,16 @@ def list_parts(destination_id: str, db: DBSession, user: CurrentUser) -> list[Pa
         }
     result: list[PartAssetRead] = []
     for part in db.query(PartAsset).filter(PartAsset.destination_id == destination_id).order_by(PartAsset.slot.asc()).all():
+        limited, limited_available = part_limited_status(part)
         result.append(
             PartAssetRead.model_validate(part).model_copy(
                 update={
                     "image_url": asset_url(part.image_path) if part.image_path else None,
                     "mask_url": asset_url(part.mask_path) if part.mask_path else None,
                     "unlocked": part.id in unlocked_ids,
+                    "limited": limited,
+                    "limited_available": limited_available,
+                    "public_sources": part_public_sources(part),
                 }
             )
         )

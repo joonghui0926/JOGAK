@@ -7,6 +7,7 @@
     "lint:frontend": "npm --prefix app/frontend run lint",
     "dev:backend": "conda run -n cjh_jogak uvicorn jogak_api.main:app --app-dir app/backend --reload --host 0.0.0.0 --port 8000",
     "seed": "conda run -n cjh_jogak python app/backend/scripts/seed_database.py",
+    "sync:public-data": "conda run -n cjh_jogak python app/backend/scripts/sync_public_data.py",
     "verify:gpu": "bash scripts/verify_gpu7.sh"
   }
 }

@@ -1,4 +1,5 @@
 import { ModelViewer } from "../../../components/ModelViewer";
+import { getApiBase } from "../../../lib/config";
 
 type GeneratedJob = {
   id: string;
@@ -14,7 +15,7 @@ type GeneratedJob = {
   };
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 async function fetchGeneratedJob(jobId: string): Promise<GeneratedJob | null> {
   const response = await fetch(`${API_BASE}/api/jobs/${jobId}`, { cache: "no-store" });

@@ -41,6 +41,25 @@ class DestinationRead(BaseModel):
     parts: list[str] = Field(default_factory=list)
 
 
+class PublicDataSourceRead(BaseModel):
+    id: str
+    provider: str
+    dataset_id: str
+    record_type: str
+    title: str
+    summary: str | None = None
+    period: str | None = None
+    material: str | None = None
+    institution: str | None = None
+    image_url: str | None = None
+    source_url: str | None = None
+    license_note: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    relation_type: str | None = None
+    verified: bool = False
+
+
 class PartAssetRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,6 +76,19 @@ class PartAssetRead(BaseModel):
     prompt_hint: str | None = None
     source_note: str | None = None
     unlocked: bool = False
+    limited: bool = False
+    limited_available: bool = True
+    public_sources: list[PublicDataSourceRead] = Field(default_factory=list)
+
+
+class DestinationCultureRead(BaseModel):
+    destination_id: str
+    culture_dna: dict[str, Any] = Field(default_factory=dict)
+    destination_sources: list[PublicDataSourceRead] = Field(default_factory=list)
+    exhibitions: list[PublicDataSourceRead] = Field(default_factory=list)
+    part_sources: dict[str, list[PublicDataSourceRead]] = Field(default_factory=dict)
+    sync_enabled: bool = False
+    configured_sources: list[str] = Field(default_factory=list)
 
 
 class VisitCheckRequest(BaseModel):

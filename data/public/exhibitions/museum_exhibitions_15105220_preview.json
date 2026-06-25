@@ -1,0 +1,117 @@
+{
+  "response": {
+    "header": {
+      "resultCode": "0000",
+      "resultMsg": "OK"
+    },
+    "body": {
+      "items": {
+        "item": [
+          {
+            "publisher": "1371086",
+            "collectionDb": "전시",
+            "creater": "국립청주박물관",
+            "title": "한국 고인쇄문화 특별전",
+            "alternativeTitle": "韩国古印刷文化",
+            "collectedDate": "2020-12-23 09:26:40",
+            "sourceAgency": "1371086",
+            "description": "한국 고인쇄문화 특별전 韓國 古印刷文化 特別展➈ 서울올림픽 문화예술 축전의 일환으로 실시한 특별전으로서 고인쇄문화와 관련이 깊은 청주 지역문화의 특성과 우리 나라 \n고인쇄문화의 우수성을 국내외에 알리고자 하였습니다.",
+            "localId": "1",
+            "url": null,
+            "subDescription": null,
+            "imageObject": "https://cheongju.museum.go.kr/DATA/exbi/20160817041420145vyDClH.jpg",
+            "videoObject": null,
+            "spatialCoverage": null,
+            "affiliation": null,
+            "charge": null,
+            "contactPoint": null,
+            "period": null
+          },
+          {
+            "publisher": "1371086",
+            "collectionDb": "전시",
+            "creater": "국립청주박물관",
+            "title": "한국출토 중국자기 특별전",
+            "alternativeTitle": "韩国出土中国 瓷器",
+            "collectedDate": "2020-12-23 09:26:40",
+            "sourceAgency": "1371086",
+            "description": "韓國出土 中國磁器 特別展&#40;한국출토 중국자기 특별전&#41;​한국출토 중국자기의 전시를 통해 우리 문화의 국제성과 문화적 다양성을 부각시키고자 하였습니다.",
+            "localId": "2",
+            "url": null,
+            "subDescription": null,
+            "imageObject": "https://cheongju.museum.go.kr/DATA/exbi/20160817041326470Z2xqBk.jpg",
+            "videoObject": null,
+            "spatialCoverage": null,
+            "affiliation": null,
+            "charge": null,
+            "contactPoint": null,
+            "period": null
+          },
+          {
+            "publisher": "1371086",
+            "collectionDb": "전시",
+            "creater": "국립청주박물관",
+            "title": "삼국시대 마구 특별전",
+            "alternativeTitle": "三国时代马具",
+            "collectedDate": "2020-12-23 09:26:40",
+            "sourceAgency": "1371086",
+            "description": "삼국시대 마구馬具 특별전제17회 전국체육대회 청주 개최를 기념하여, 삼국시대 마구류를 한자리에 모아 재조명하고, 고대 마구의 이해 및 \n금속공예술과 기술성을 엿볼 수 있는 기회를 제공하고자 하였습니다.",
+            "localId": "3",
+            "url": null,
+            "subDescription": null,
+            "imageObject": "https://cheongju.museum.go.kr/DATA/exbi/20160817041232007MoBoZO.jpg",
+            "videoObject": null,
+            "spatialCoverage": null,
+            "affiliation": null,
+            "charge": null,
+            "contactPoint": null,
+            "period": null
+          },
+          {
+            "publisher": "1371086",
+            "collectionDb": "전시",
+            "creater": "국립청주박물관",
+            "title": "김연호金然鎬 수집문화재",
+            "alternativeTitle": "金艳浩收藏文化财",
+            "collectedDate": "2020-12-23 09:26:40",
+            "sourceAgency": "1371086",
+            "description": "기증유물특별전 김연호金然鎬 수집문화재蒐集文化財​우리 문화에 대한 깊은 관심과 애정으로 \n문화재를 수집하여 기증한 김연호 선생의 높은 뜻을 기리기 위하여 마련한 특별전입니다.",
+            "localId": "4",
+            "url": null,
+            "subDescription": null,
+            "imageObject": "https://cheongju.museum.go.kr/DATA/exbi/20160817041110674n18Sld.jpg",
+            "videoObject": null,
+            "spatialCoverage": null,
+            "affiliation": null,
+            "charge": null,
+            "contactPoint": null,
+            "period": null
+          },
+          {
+            "publisher": "1371086",
+            "collectionDb": "전시",
+            "creater": "국립청주박물관",
+            "title": "국립박물관 소장 한국의 동경銅鏡",
+            "alternativeTitle": "韩国的东京",
+            "collectedDate": "2020-12-23 09:26:40",
+            "sourceAgency": "1371086",
+            "description": "국립박물관 소장 한국韓國의 동경銅鏡청동기시대에서 조선시대에 이르는 한국의 \n동경과 중국 동경을 비교 전시하여 시대적 변천과정 및 특성을 이해하도록하였습니다.",
+            "localId": "5",
+            "url": null,
+            "subDescription": null,
+            "imageObject": "https://cheongju.museum.go.kr/DATA/exbi/20160817040931401sLyaVE.jpg",
+            "videoObject": null,
+            "spatialCoverage": null,
+            "affiliation": null,
+            "charge": null,
+            "contactPoint": null,
+            "period": null
+          }
+        ]
+      },
+      "numOfRows": "5",
+      "pageNo": "1",
+      "totalCount": "1675"
+    }
+  }
+}

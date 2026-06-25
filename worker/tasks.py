@@ -17,6 +17,7 @@ from jogak_api.services.jobs import update_job
 from jogak_api.services.hunyuan import generate_glb_from_image, gpu7_env
 from jogak_api.services.openai_images import build_pretravel_concept_prompt, build_refine_prompt, generate_concept_image
 from jogak_api.services.part_aware_3d import generate_part_aware_glb
+from jogak_api.services.public_data import build_public_data_prompt_context
 from jogak_api.services.storage import asset_url, sha256_file
 
 
@@ -98,11 +99,16 @@ def run_generation_job(job_id: str) -> None:
             layer_rows = []
             part_map = {}
             if job.type == "pretravel_concept":
+                public_data_context = build_public_data_prompt_context(
+                    db,
+                    destination_id=destination.id,
+                )
                 concept_prompt = build_pretravel_concept_prompt(
                     destination_name=destination.name,
                     destination_dna=destination.dna,
                     text_prompt=concept.text_prompt if concept else "",
                     style=concept.style if concept else "책상 피규어",
+                    public_data_context=public_data_context,
                 )
                 if concept and concept.user_photo_path:
                     reference_paths.append(Path(concept.user_photo_path))
@@ -124,6 +130,11 @@ def run_generation_job(job_id: str) -> None:
                     for part in db.query(PartAsset).filter(PartAsset.id.in_(layer_part_ids)).all()
                 } if layer_part_ids else {}
                 unlocked_parts = [part.name for part in part_map.values()]
+                public_data_context = build_public_data_prompt_context(
+                    db,
+                    destination_id=destination.id,
+                    part_ids=list(part_map),
+                )
                 composition = session.composition_json if session else {}
                 stage_width = float(composition.get("stage_width") or 312)
                 stage_height = float(composition.get("stage_height") or 288)
@@ -140,6 +151,7 @@ def run_generation_job(job_id: str) -> None:
                     style=concept.style if concept else "책상 피규어",
                     unlocked_parts=unlocked_parts,
                     layout_notes=layout_notes,
+                    public_data_context=public_data_context,
                 )
                 reference_paths.extend(editor_reference_paths(session, figurine))
                 if session:

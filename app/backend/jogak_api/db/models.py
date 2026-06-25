@@ -119,6 +119,73 @@ class PartAsset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     destination: Mapped[Destination] = relationship(back_populates="parts")
+    public_data_links: Mapped[list["PartPublicDataLink"]] = relationship(
+        back_populates="part_asset",
+        cascade="all, delete-orphan",
+    )
+
+
+class PublicDataRecord(Base):
+    __tablename__ = "public_data_records"
+    __table_args__ = (
+        UniqueConstraint("provider", "dataset_id", "external_id", name="uq_public_data_record"),
+        Index("idx_public_data_destination_type", "destination_id", "record_type"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    destination_id: Mapped[str | None] = mapped_column(
+        ForeignKey("destinations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(120), index=True)
+    dataset_id: Mapped[str] = mapped_column(String(80), index=True)
+    external_id: Mapped[str] = mapped_column(String(255))
+    record_type: Mapped[str] = mapped_column(String(40), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    period: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    material: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    institution: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    license_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    raw_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    checksum: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    part_links: Mapped[list["PartPublicDataLink"]] = relationship(
+        back_populates="public_data_record",
+        cascade="all, delete-orphan",
+    )
+
+
+class PartPublicDataLink(Base):
+    __tablename__ = "part_public_data_links"
+    __table_args__ = (
+        UniqueConstraint("part_asset_id", "public_data_record_id", "relation_type", name="uq_part_public_data_link"),
+        Index("idx_part_public_data_relation", "part_asset_id", "relation_type"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    part_asset_id: Mapped[str] = mapped_column(
+        ForeignKey("part_assets.id", ondelete="CASCADE"),
+        index=True,
+    )
+    public_data_record_id: Mapped[str] = mapped_column(
+        ForeignKey("public_data_records.id", ondelete="CASCADE"),
+        index=True,
+    )
+    relation_type: Mapped[str] = mapped_column(String(40), index=True)
+    match_score: Mapped[float] = mapped_column(Float, default=0.0)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    prompt_constraints_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    part_asset: Mapped[PartAsset] = relationship(back_populates="public_data_links")
+    public_data_record: Mapped[PublicDataRecord] = relationship(back_populates="part_links")
 
 
 class Visit(Base):

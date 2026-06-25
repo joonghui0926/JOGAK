@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/jogak_dev.db"
     redis_url: str = "redis://localhost:6379/0"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origin_regex: str | None = None
 
     jwt_secret: str = "dev-change-me"
     jwt_issuer: str = "jogak-api"
@@ -36,9 +37,16 @@ class Settings(BaseSettings):
     user_upload_ttl_days: int = 30
 
     public_data_sync_enabled: bool = False
+    data_go_kr_api_key: str | None = None
     tourapi_key: str | None = None
     culture_data_key: str | None = None
     pattern_api_key: str | None = None
+    tourapi_base_url: str = "https://apis.data.go.kr/B551011/KorService2"
+    culture_emuseum_api_url: str | None = None
+    culture_exhibition_api_url: str | None = None
+    culture_pattern_api_url: str | None = None
+    public_data_exhibition_file: Path = Path("/SSD/guest/chojoonghui/JOGAK/data/public/exhibitions")
+    public_data_timeout_seconds: float = 20.0
 
     cuda_visible_devices: str = "7"
     nvidia_visible_devices: str = "7"

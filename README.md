@@ -44,3 +44,15 @@ bash scripts/setup_hunyuan3d21.sh
 ## 비밀키
 
 `.env`는 만들어져 있습니다. `OPENAI_API_KEY`, OAuth client secret, Kakao secret은 프론트에 노출하지 않고 FastAPI/worker 쪽에서만 읽습니다.
+
+## 공공데이터
+
+기존 2D 부품은 그대로 사용하고, TourAPI·e뮤지엄·전통문양·박물관 전시 데이터를 부품의 원본 문화유산, 시대, 재질, 소장기관, 해설, 기간 한정 해금에 연결합니다.
+
+공공데이터포털 일반 인증키는 `DATA_GO_KR_API_KEY` 하나에 넣으면 됩니다. 개별 제공처 키가 따로 있을 때만 `TOURAPI_KEY`, `CULTURE_DATA_KEY`, `PATTERN_API_KEY`로 덮어씁니다. 전시 통합정보 활용신청이 막힌 경우에는 JSON/CSV 파일을 `data/public/exhibitions`에 두면 로컬 공공데이터로 동기화됩니다.
+
+연동 형식과 필요한 환경변수는 [docs/public-data-integration.md](docs/public-data-integration.md)에 정리되어 있습니다.
+
+## 배포
+
+프론트는 Vercel, 백엔드는 GPU 7번이 있는 현재 서버와 Cloudflare Tunnel을 사용합니다. 설정 순서와 필요한 Cloudflare/Vercel 작업은 [docs/deploy-vercel-cloudflare.md](docs/deploy-vercel-cloudflare.md)에 정리되어 있습니다.

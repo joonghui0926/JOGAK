@@ -1,17 +1,21 @@
 {
   "framework": "nextjs",
+  "env": {
+    "JOGAK_API_URL": "https://api.munhuajogak.co.kr",
+    "NEXT_PUBLIC_API_BASE_URL": "https://api.munhuajogak.co.kr"
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.jogak.kr/api/:path*"
+      "destination": "https://api.munhuajogak.co.kr/api/:path*"
     },
     {
       "source": "/auth/:path*",
-      "destination": "https://api.jogak.kr/auth/:path*"
+      "destination": "https://api.munhuajogak.co.kr/auth/:path*"
     },
     {
       "source": "/assets/:path*",
-      "destination": "https://assets.jogak.kr/:path*"
+      "destination": "https://api.munhuajogak.co.kr/assets/:path*"
     }
   ]
 }

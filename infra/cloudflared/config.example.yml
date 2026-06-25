@@ -1,9 +1,7 @@
-tunnel: jogak-api
-credentials-file: /etc/cloudflared/jogak-api.json
+tunnel: <JOGAK_TUNNEL_ID>
+credentials-file: /home/guest/.cloudflared/<JOGAK_TUNNEL_ID>.json
 
 ingress:
-  - hostname: api.jogak.kr
-    service: http://127.0.0.1:8000
-  - hostname: assets.jogak.kr
-    service: http://127.0.0.1:8000/assets
+  - hostname: api.munhuajogak.co.kr
+    service: http://127.0.0.1:8010
   - service: http_status:404

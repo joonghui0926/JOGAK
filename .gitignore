@@ -35,4 +35,5 @@ data/assets/split_pipeline/*
 !data/assets/split_pipeline/split_nmok_general_components_001/**
 docs/screenshots/*
 third_party/*
+bin/cloudflared
 app/frontend/public/workbox-*

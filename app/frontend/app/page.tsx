@@ -54,6 +54,7 @@ import {
   createEditorSession,
   createGuestSession,
   createPretravelConcept,
+  fetchDestinationCulture,
   fetchDestinationParts,
   fetchDestinations,
   fetchJob,
@@ -63,9 +64,18 @@ import {
   setAuthToken,
   startEmailLogin
 } from "../lib/api";
-import type { Destination, EditorLayer, JobStatus, PartAsset, Screen } from "../lib/types";
+import { getApiBase } from "../lib/config";
+import type {
+  Destination,
+  DestinationCulture,
+  EditorLayer,
+  JobStatus,
+  PartAsset,
+  PublicDataSource,
+  Screen
+} from "../lib/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 const screenTitles: Partial<Record<Screen, string>> = {
   home: "나의 조각장",
@@ -104,6 +114,7 @@ export default function JogakApp() {
   const [unlockNotice, setUnlockNotice] = useState("현재 위치를 확인하면 방문 인증과 부품 해금이 진행됩니다.");
   const [unlockedParts, setUnlockedParts] = useState<string[]>([]);
   const [partAssets, setPartAssets] = useState<PartAsset[]>([]);
+  const [cultureData, setCultureData] = useState<DestinationCulture | null>(null);
   const [layers, setLayers] = useState<EditorLayer[]>([]);
   const [selectedLayer, setSelectedLayer] = useState("");
   const [dragState, setDragState] = useState<{ id: string; dx: number; dy: number } | null>(null);
@@ -131,11 +142,15 @@ export default function JogakApp() {
   useEffect(() => {
     if (!selectedDestination) {
       setPartAssets([]);
+      setCultureData(null);
       return;
     }
     fetchDestinationParts(selectedDestination.id)
       .then(setPartAssets)
       .catch(() => setPartAssets([]));
+    fetchDestinationCulture(selectedDestination.id)
+      .then(setCultureData)
+      .catch(() => setCultureData(null));
   }, [selectedDestination?.id]);
 
   useEffect(() => {
@@ -466,6 +481,7 @@ export default function JogakApp() {
                 selectedDestination ? (
                   <DestinationScreen
                     destination={selectedDestination}
+                    cultureData={cultureData}
                     onBack={() => setScreen("explore")}
                     onMaker={() => setScreen("maker")}
                     onParts={() => setScreen("parts")}
@@ -504,7 +520,13 @@ export default function JogakApp() {
 
               {screen === "parts" && (
                 selectedDestination ? (
-                  <PartsScreen destination={selectedDestination} onBack={() => setScreen("destination")} onNotify={() => setScreen("unlock")} onMaker={() => setScreen("maker")} />
+                  <PartsScreen
+                    destination={selectedDestination}
+                    parts={partAssets}
+                    onBack={() => setScreen("destination")}
+                    onNotify={() => setScreen("unlock")}
+                    onMaker={() => setScreen("maker")}
+                  />
                 ) : (
                   <DestinationRequired onExplore={() => setScreen("explore")} />
                 )
@@ -555,7 +577,14 @@ export default function JogakApp() {
               )}
 
               {screen === "story" && (
-                selectedDestination ? <StoryScreen destination={selectedDestination} onBack={() => setScreen("preview")} /> : <DestinationRequired onExplore={() => setScreen("explore")} />
+                selectedDestination ? (
+                  <StoryScreen
+                    destination={selectedDestination}
+                    cultureData={cultureData}
+                    parts={partAssets}
+                    onBack={() => setScreen("preview")}
+                  />
+                ) : <DestinationRequired onExplore={() => setScreen("explore")} />
               )}
 
               {screen === "print" && (
@@ -756,12 +785,14 @@ function ExploreScreen({
 
 function DestinationScreen({
   destination,
+  cultureData,
   onBack,
   onMaker,
   onParts,
   onRoute
 }: {
   destination: Destination;
+  cultureData: DestinationCulture | null;
   onBack: () => void;
   onMaker: () => void;
   onParts: () => void;
@@ -781,6 +812,9 @@ function DestinationScreen({
       </div>
       <h1 className="title-tight">{destination.name}</h1>
       <p className="desc">{destination.summary}</p>
+      {destination.representative_image_url && (
+        <img className="destination-photo" src={destination.representative_image_url} alt={`${destination.name} 공공데이터 대표 이미지`} />
+      )}
       <div className="map-panel">
         <iframe
           title={`${destination.name} 지도`}
@@ -791,7 +825,16 @@ function DestinationScreen({
       <div className="label">이곳에서 만나는 것</div>
       <div className="action-list">
         <ActionRow icon={<BookOpen />} title="대표 이야기" text={destination.dna} tag="STORY" />
-        <ActionRow icon={<ImageIcon />} title="이미지 자료" text="TourAPI와 문화 공공데이터 이미지가 연결될 자리입니다." tag="PHOTO" />
+        <ActionRow
+          icon={<ImageIcon />}
+          title="공공데이터 자료"
+          text={
+            cultureData?.destination_sources.length
+              ? `${cultureData.destination_sources[0].provider} 자료 ${cultureData.destination_sources.length}건이 연결됐습니다.`
+              : "공공데이터 동기화 후 공식 관광정보와 이미지가 연결됩니다."
+          }
+          tag={cultureData?.destination_sources.length ? "연결됨" : "대기"}
+        />
         <ActionRow icon={<Route />} title="가는 길" text="실제 지도 좌표를 기준으로 이동 경로를 엽니다." tag="MAP" onClick={onRoute} />
       </div>
       <div className="button-stack">
@@ -920,7 +963,19 @@ function PrePreviewScreen({ destination, onUnlock, onRetry }: { destination: Des
   );
 }
 
-function PartsScreen({ destination, onBack, onNotify, onMaker }: { destination: Destination; onBack: () => void; onNotify: () => void; onMaker: () => void }) {
+function PartsScreen({
+  destination,
+  parts,
+  onBack,
+  onNotify,
+  onMaker
+}: {
+  destination: Destination;
+  parts: PartAsset[];
+  onBack: () => void;
+  onNotify: () => void;
+  onMaker: () => void;
+}) {
   return (
     <div className="screen-section">
       <div className="screen-heading">
@@ -934,14 +989,32 @@ function PartsScreen({ destination, onBack, onNotify, onMaker }: { destination: 
         </button>
       </div>
       <h1 className="title-tight">이곳에서 만들 수 있는 조각</h1>
-      <p className="desc">현장에 도착하면 아래 부품들이 열리고, 나만의 {destination.name} 조각을 만들 수 있어요.</p>
-      <div className="label">해금 가능한 부품 {destination.parts.length}</div>
-      <div className="parts-grid">
-        {destination.parts.map((part) => (
-          <div className="part locked" key={part}>
-            <b>{part}</b>
-            <span>2D asset</span>
-          </div>
+      <p className="desc">부품은 이미 제작되어 있으며, 공공데이터는 원본 문화유산과 전시 기간을 연결합니다.</p>
+      <div className="label">해금 가능한 부품 {parts.length || destination.parts.length}</div>
+      <div className="part-catalog">
+        {parts.length ? parts.map((part) => {
+          const source = part.public_sources[0];
+          return (
+            <article className="part-catalog-row" key={part.id}>
+              {part.image_url ? <img src={part.image_url} alt="" /> : <div className="part-image-empty" />}
+              <div>
+                <b>{part.name}</b>
+                <span>{source ? sourceFact(source) : "공공데이터 원본 연결 대기"}</span>
+                {part.limited && (
+                  <em>{part.limited_available ? "현재 전시 한정 해금 가능" : "전시 기간 외 잠김"}</em>
+                )}
+              </div>
+              <small>{source ? "SOURCE" : part.slot.toUpperCase()}</small>
+            </article>
+          );
+        }) : destination.parts.map((part) => (
+          <article className="part-catalog-row" key={part}>
+            <div className="part-image-empty" />
+            <div>
+              <b>{part}</b>
+              <span>부품 메타데이터를 불러오는 중입니다.</span>
+            </div>
+          </article>
         ))}
       </div>
       <div className="button-stack">
@@ -1325,7 +1398,21 @@ function PreviewScreen({
   );
 }
 
-function StoryScreen({ destination, onBack }: { destination: Destination; onBack: () => void }) {
+function StoryScreen({
+  destination,
+  cultureData,
+  parts,
+  onBack
+}: {
+  destination: Destination;
+  cultureData: DestinationCulture | null;
+  parts: PartAsset[];
+  onBack: () => void;
+}) {
+  const sourcedParts = parts.filter((part) => part.public_sources.length);
+  const officialUrl =
+    sourcedParts[0]?.public_sources[0]?.source_url ||
+    cultureData?.destination_sources[0]?.source_url;
   return (
     <div className="screen-section">
       <div className="screen-heading">
@@ -1341,20 +1428,74 @@ function StoryScreen({ destination, onBack }: { destination: Destination; onBack
       <h1 className="title-tight">이 조각에 담긴 이야기</h1>
       <div className="action-list">
         <ActionRow icon={<Gem />} title="문화 DNA" text={destination.dna} tag="DNA" />
-        <ActionRow icon={<BookOpen />} title="출처 저장" text="공공데이터 source_url, license_note, fetched_at을 함께 보관합니다." tag="SOURCE" />
-        <ActionRow icon={<ImageIcon />} title="생성 근거" text="사용자 입력, 기본 조각, 해금 부품 배치를 최종 2D 이미지로 정리했습니다." tag="AI" />
+        <ActionRow
+          icon={<BookOpen />}
+          title="공공데이터 근거"
+          text={`${sourcedParts.length}개 부품에 유물·문양·전시 원본이 연결되어 생성 제약에 반영됩니다.`}
+          tag="SOURCE"
+        />
+        <ActionRow
+          icon={<ImageIcon />}
+          title="고증 반영"
+          text="공식 데이터의 시대, 재질, 소장기관과 문양 정보를 2D 생성 프롬프트에 사용합니다."
+          tag="AI"
+        />
       </div>
+      <div className="label">부품별 문화유산</div>
+      <div className="source-list">
+        {sourcedParts.length ? sourcedParts.map((part) => (
+          <section className="provenance-part" key={part.id}>
+            <div className="provenance-heading">
+              {part.image_url && <img src={part.image_url} alt="" />}
+              <div>
+                <b>{part.name}</b>
+                <span>{part.public_sources.length}개 공공데이터 근거</span>
+              </div>
+            </div>
+            {part.public_sources.map((source) => (
+              <PublicSourceRow key={`${part.id}-${source.id}`} source={source} />
+            ))}
+          </section>
+        )) : (
+          <div className="empty-source">
+            <b>아직 연결된 원본 레코드가 없습니다.</b>
+            <span>공공데이터 키와 Culture Portal endpoint를 설정한 뒤 동기화하면 표시됩니다.</span>
+          </div>
+        )}
+      </div>
+      {!!cultureData?.exhibitions.length && (
+        <>
+          <div className="label">기간 한정 전시</div>
+          <div className="source-list">
+            {cultureData.exhibitions.map((source) => <PublicSourceRow key={source.id} source={source} />)}
+          </div>
+        </>
+      )}
       <div className="button-stack">
-        <button className="primary" type="button">
+        <button className="primary" type="button" onClick={() => officialUrl && window.open(officialUrl, "_blank", "noopener,noreferrer")} disabled={!officialUrl}>
           <BookOpen aria-hidden />
-          관광지 이야기 더 보기
-        </button>
-        <button className="secondary" type="button">
-          <Share2 aria-hidden />
           공식 정보 열기
         </button>
       </div>
     </div>
+  );
+}
+
+function PublicSourceRow({ source }: { source: PublicDataSource }) {
+  return (
+    <a
+      className="public-source-row"
+      href={source.source_url || undefined}
+      target={source.source_url ? "_blank" : undefined}
+      rel={source.source_url ? "noreferrer" : undefined}
+    >
+      <div>
+        <b>{source.title}</b>
+        <span>{sourceFact(source)}</span>
+        {(source.starts_at || source.ends_at) && <em>{formatPublicPeriod(source)}</em>}
+      </div>
+      <small>{source.provider}</small>
+    </a>
   );
 }
 
@@ -1517,6 +1658,19 @@ function GoogleLogo() {
 
 function openRoute(destination: Destination) {
   window.open(`https://www.openstreetmap.org/directions?to=${destination.lat}%2C${destination.lon}`, "_blank", "noopener,noreferrer");
+}
+
+function sourceFact(source: PublicDataSource) {
+  const facts = [source.period, source.material, source.institution].filter(Boolean);
+  return facts.length ? facts.join(" · ") : `${source.provider} 공식 데이터`;
+}
+
+function formatPublicPeriod(source: PublicDataSource) {
+  const formatter = new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "short", day: "numeric" });
+  const start = source.starts_at ? formatter.format(new Date(source.starts_at)) : null;
+  const end = source.ends_at ? formatter.format(new Date(source.ends_at)) : null;
+  if (start && end) return `${start} - ${end}`;
+  return start || end || "";
 }
 
 function clamp(value: number, min: number, max: number) {

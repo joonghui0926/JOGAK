@@ -22,7 +22,14 @@ def build_destination_identity_hint(destination_name: str, destination_dna: str)
     )
 
 
-def build_pretravel_concept_prompt(*, destination_name: str, destination_dna: str, text_prompt: str, style: str) -> str:
+def build_pretravel_concept_prompt(
+    *,
+    destination_name: str,
+    destination_dna: str,
+    text_prompt: str,
+    style: str,
+    public_data_context: str = "",
+) -> str:
     identity_hint = build_destination_identity_hint(destination_name, destination_dna)
     return (
         "Create one production-ready 2D concept image for a pre-travel collectible figurine base. "
@@ -39,6 +46,7 @@ def build_pretravel_concept_prompt(*, destination_name: str, destination_dna: st
         "shallow rear backdrop shapes, and architectural rhythm on the base. No readable text anywhere. "
         f"{identity_hint}"
         f"Destination: {destination_name}. Cultural DNA: {destination_dna}. "
+        f"{public_data_context} "
         f"User style: {style}. User note: {text_prompt}."
     )
 
@@ -51,6 +59,7 @@ def build_refine_prompt(
     style: str,
     unlocked_parts: list[str],
     layout_notes: str = "",
+    public_data_context: str = "",
 ) -> str:
     part_hint = ", ".join(unlocked_parts[:20])
     placement = f" Placement notes from the editor canvas: {layout_notes}." if layout_notes else ""
@@ -85,6 +94,7 @@ def build_refine_prompt(
         "Do not add readable text, labels, plaques, logos, or numbers "
         "unless they already exist inside a provided unlocked part image. "
         f"Destination: {destination_name}. Cultural DNA: {destination_dna}. "
+        f"{public_data_context} "
         f"Unlocked parts in this composition: {part_hint}.{placement} User style: {style}. User note: {text_prompt}."
     )
 

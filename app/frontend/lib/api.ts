@@ -1,6 +1,7 @@
-import type { Destination, EditorLayer, JobStatus, PartAsset } from "./types";
+import type { Destination, DestinationCulture, EditorLayer, JobStatus, PartAsset } from "./types";
+import { getApiBase } from "./config";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 let authToken = typeof window !== "undefined" ? window.localStorage.getItem("jogak_access_token") : null;
 
@@ -36,6 +37,10 @@ export async function fetchDestinations(query = ""): Promise<Destination[]> {
 
 export async function fetchDestinationParts(destinationId: string): Promise<PartAsset[]> {
   return apiFetch<PartAsset[]>(`/api/destinations/${destinationId}/parts`);
+}
+
+export async function fetchDestinationCulture(destinationId: string): Promise<DestinationCulture> {
+  return apiFetch<DestinationCulture>(`/api/destinations/${destinationId}/culture`);
 }
 
 export async function createGuestSession() {

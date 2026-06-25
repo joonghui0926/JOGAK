@@ -6,6 +6,7 @@ from jogak_api.deps import CurrentUser, DBSession
 from jogak_api.db.models import Destination, Unlock, Visit
 from jogak_api.schemas import VisitCheckRequest, VisitCheckResponse
 from jogak_api.services.geofence import is_inside_geofence
+from jogak_api.services.public_data import part_limited_status
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
@@ -40,6 +41,9 @@ def check_visit(payload: VisitCheckRequest, db: DBSession, user: CurrentUser) ->
     unlocked: list[str] = []
     if verified:
         for part in destination.parts:
+            limited, limited_available = part_limited_status(part)
+            if limited and not limited_available:
+                continue
             unlocked.append(part.id)
             if user:
                 exists = (
