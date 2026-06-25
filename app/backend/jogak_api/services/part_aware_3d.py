@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image
 
@@ -119,6 +120,7 @@ def generate_part_aware_glb(
     part_map: dict[str, PartAsset],
     output_path: Path,
     job_id: str,
+    on_progress: Callable[[str, int], None] | None = None,
 ) -> Path:
     settings = get_settings()
     root = Path(__file__).resolve().parents[4]
@@ -131,6 +133,8 @@ def generate_part_aware_glb(
 
     character_glb = output_path.with_name("character_source.glb")
     if not character_glb.exists() or character_glb.stat().st_size == 0:
+        if on_progress:
+            on_progress("hunyuan_character", 60)
         generate_glb_from_image(
             image_path=character_image_path,
             output_path=character_glb,
@@ -138,13 +142,25 @@ def generate_part_aware_glb(
             blender_postprocess=False,
             round_plinth=False,
         )
+    if on_progress:
+        on_progress("hunyuan_character_done", 68)
 
     part_specs = []
-    for layer in sorted(layers, key=lambda item: item.z_index):
-        if not layer.visible or not layer.part_asset_id or layer.part_asset_id not in part_map:
-            continue
+    visible_layers = [
+        layer
+        for layer in sorted(layers, key=lambda item: item.z_index)
+        if layer.visible and layer.part_asset_id and layer.part_asset_id in part_map
+    ]
+    part_count = len(visible_layers)
+    for index, layer in enumerate(visible_layers, start=1):
         part = part_map[layer.part_asset_id]
+        if on_progress:
+            start = 68 + round(((index - 1) / max(part_count, 1)) * 20)
+            on_progress(f"hunyuan_part_{index}_{part_count}", start)
         part_glb = generate_part_glb(part, job_id=job_id)
+        if on_progress:
+            done = 68 + round((index / max(part_count, 1)) * 20)
+            on_progress(f"hunyuan_part_{index}_{part_count}_done", done)
         part_specs.append(
             layer_to_part_spec(
                 layer=layer,
@@ -170,6 +186,8 @@ def generate_part_aware_glb(
     manifest_path = output_path.with_name("part_aware_manifest.json")
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    if on_progress:
+        on_progress("blender_part_assembly", 92)
     cmd = [
         settings.blender_bin,
         "--background",
@@ -180,4 +198,6 @@ def generate_part_aware_glb(
         str(manifest_path),
     ]
     subprocess.run(cmd, check=True, cwd=root, env=gpu7_env())
+    if on_progress:
+        on_progress("blender_part_assembly_done", 96)
     return output_path

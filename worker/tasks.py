@@ -235,6 +235,10 @@ def run_generation_job(job_id: str) -> None:
             glb_dir = settings.asset_storage_root / "glb" / job_id
             if job.type == "hunyuan_final" and session and layer_rows:
                 character_path = pretravel_base_path(figurine) or concept_path
+
+                def report_part_progress(state: str, progress: int) -> None:
+                    update_job(db, job_id, state=state, progress=progress)
+
                 glb_path = generate_part_aware_glb(
                     session=session,
                     figurine=figurine,
@@ -243,6 +247,7 @@ def run_generation_job(job_id: str) -> None:
                     part_map=part_map,
                     output_path=glb_dir / "preview.glb",
                     job_id=job_id,
+                    on_progress=report_part_progress,
                 )
             else:
                 glb_path = generate_glb_from_image(image_path=concept_path, output_path=glb_dir / "preview.glb", job_id=job_id)

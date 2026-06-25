@@ -119,11 +119,20 @@ const screenTitles: Partial<Record<Screen, string>> = {
 function estimatedProgressCeiling(job: JobStatus): number {
   if (job.status === "done" || job.status === "failed") return 100;
   const state = job.current_state || "queued";
+  const serverProgress = job.progress || 0;
   if (state.includes("queued")) return 14;
   if (state.includes("dna")) return 24;
   if (state.includes("openai")) return 54;
-  if (state.includes("hunyuan")) return job.type === "hunyuan_final" ? 94 : 90;
+  if (state.includes("hunyuan_part")) return Math.min(90, serverProgress + 3);
+  if (state.includes("blender_part")) return Math.min(96, serverProgress + 3);
+  if (state.includes("hunyuan")) return job.type === "hunyuan_final" ? Math.min(72, serverProgress + 3) : 90;
   return Math.max(job.progress || 0, 78);
+}
+
+function partProgressText(state: string): string | null {
+  const match = state.match(/hunyuan_part_(\d+)_(\d+)/);
+  if (!match) return null;
+  return `부품 ${match[1]}/${match[2]} 입체화`;
 }
 
 function jobStatusLabel(job: JobStatus | null): string {
@@ -131,8 +140,12 @@ function jobStatusLabel(job: JobStatus | null): string {
   if (job.status === "done") return "완료";
   if (job.status === "failed") return "실패";
   const state = job.current_state || "queued";
+  const partLabel = partProgressText(state);
+  if (partLabel) return partLabel;
   if (state.includes("openai")) return job.type === "editor_refine_2d" ? "자연 배치 2D 생성" : "2D 프리뷰 생성";
-  if (state.includes("hunyuan")) return job.type === "hunyuan_final" ? "부품별 3D 조립" : "Hunyuan3D 변환";
+  if (state.includes("hunyuan_character")) return "캐릭터 입체화";
+  if (state.includes("blender_part")) return "최종 조립";
+  if (state.includes("hunyuan")) return job.type === "hunyuan_final" ? "3D 조각 준비" : "3D 프리뷰 변환";
   if (state.includes("dna")) return "문화 DNA 정리";
   return "대기열 확인";
 }
@@ -1640,7 +1653,7 @@ function GenerateScreen({
         {failed
           ? job?.error || "생성 작업이 실패했습니다."
           : isFinal
-            ? "OpenAI가 자연스러운 최종 2D 배치 이미지를 만들고, Hunyuan은 캐릭터와 부품을 따로 3D화한 뒤 Blender가 조립합니다."
+            ? "배치한 부품의 형태를 보존하면서 캐릭터와 부품을 따로 입체화한 뒤 하나의 조각으로 맞춥니다."
             : isRefine
               ? "프리뷰와 해금 부품의 배치 의도를 보존해 자연스러운 2D 확인 이미지를 만듭니다."
               : "해금 부품은 넣지 않고, 의상과 원판, 장소 분위기만 반영한 방문 전 2D/3D 프리뷰를 만듭니다."}
@@ -1665,19 +1678,19 @@ function GenerateScreen({
         <Step
           done={progress > 82}
           now={progress > 52 && progress <= 82}
-          title={isFinal ? "부품별 Hunyuan3D" : "Hunyuan3D 변환"}
-          text={isFinal ? "캐릭터와 각 부품 GLB를 따로 만들고 캐시합니다." : "GPU 7 worker가 GLB 미리보기를 생성합니다."}
+          title={isFinal ? "부품 입체화" : "3D 프리뷰 변환"}
+          text={isFinal ? "캐릭터와 각 부품을 따로 입체화해 원래 형태를 최대한 보존합니다." : "방문 전 조각을 3D 미리보기로 변환합니다."}
           tag="3D"
         />
         <Step
           done={progress >= 100}
           now={progress > 82 && progress < 100}
-          title={isFinal ? "Blender 조립" : "제작 파일 준비"}
-          text={isFinal ? "원판, 계단, 발 접지, 착용/손소품/배경 관계를 조립합니다." : "Blender 후처리와 printability check를 준비합니다."}
+          title={isFinal ? "최종 조립" : "제작 파일 준비"}
+          text={isFinal ? "원판, 발 접지, 착용 부품, 손소품, 배경 요소를 하나의 피규어로 맞춥니다." : "후처리와 출력 안정성 확인을 준비합니다."}
           tag="STL"
         />
       </div>
-      <p className="data-note">Job {job?.id || "local"} · {job?.status || "queued"} · 화면을 나가도 서버 작업은 계속됩니다 · GPU index 7 only</p>
+      <p className="data-note">작업 번호 {job?.id || "local"} · 화면을 나가도 제작은 계속됩니다.</p>
     </div>
   );
 }
