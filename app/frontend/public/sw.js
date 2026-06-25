@@ -1,4 +1,4 @@
-const CACHE_NAME = "jogak-shell-v2";
+const CACHE_NAME = "jogak-shell-v3";
 const APP_SHELL = ["/", "/favicon.png", "/icons/jogak-transparent.png", "/icons/jogak-logo.png"];
 
 self.addEventListener("install", (event) => {

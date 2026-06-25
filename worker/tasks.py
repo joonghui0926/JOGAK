@@ -224,6 +224,7 @@ def run_generation_job(job_id: str) -> None:
                     status="done",
                     result={
                         "figurine_id": figurine.id,
+                        "destination_id": destination.id,
                         "concept_path": str(concept_path),
                         "concept_url": asset_url(concept_path),
                     },
@@ -267,6 +268,7 @@ def run_generation_job(job_id: str) -> None:
                 status="done",
                 result={
                     "figurine_id": figurine.id,
+                    "destination_id": destination.id,
                     "concept_path": str(concept_path),
                     "concept_url": asset_url(concept_path),
                     "glb_path": str(glb_path),

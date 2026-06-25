@@ -78,6 +78,13 @@ import type {
 
 const API_BASE = getApiBase();
 const REVIEW_UNLOCK_EMAIL = "jjoonghui@gmail.com";
+const ACTIVE_JOB_STORAGE_KEY = "jogak_active_job_id";
+
+type JobNotice = {
+  job: JobStatus;
+  title: string;
+  message: string;
+};
 
 const screenTitles: Partial<Record<Screen, string>> = {
   home: "나의 조각장",
@@ -97,9 +104,31 @@ const screenTitles: Partial<Record<Screen, string>> = {
   profile: "내정보"
 };
 
+function estimatedProgressCeiling(job: JobStatus): number {
+  if (job.status === "done" || job.status === "failed") return 100;
+  const state = job.current_state || "queued";
+  if (state.includes("queued")) return 14;
+  if (state.includes("dna")) return 24;
+  if (state.includes("openai")) return 54;
+  if (state.includes("hunyuan")) return job.type === "hunyuan_final" ? 94 : 90;
+  return Math.max(job.progress || 0, 78);
+}
+
+function jobStatusLabel(job: JobStatus | null): string {
+  if (!job) return "대기";
+  if (job.status === "done") return "완료";
+  if (job.status === "failed") return "실패";
+  const state = job.current_state || "queued";
+  if (state.includes("openai")) return job.type === "editor_refine_2d" ? "자연 배치 2D 생성" : "2D 프리뷰 생성";
+  if (state.includes("hunyuan")) return job.type === "hunyuan_final" ? "부품별 3D 조립" : "Hunyuan3D 변환";
+  if (state.includes("dna")) return "문화 DNA 정리";
+  return "대기열 확인";
+}
+
 export default function JogakApp() {
   const [screen, setScreen] = useState<Screen>("login");
   const [storyReturnScreen, setStoryReturnScreen] = useState<Screen>("destination");
+  const [jobReturnScreen, setJobReturnScreen] = useState<Screen>("home");
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [query, setQuery] = useState("");
@@ -115,6 +144,8 @@ export default function JogakApp() {
   const [editorSessionId, setEditorSessionId] = useState<string | null>(null);
   const [job, setJob] = useState<JobStatus | null>(null);
   const [jobProgress, setJobProgress] = useState(0);
+  const [jobNotice, setJobNotice] = useState<JobNotice | null>(null);
+  const [jobPollWarning, setJobPollWarning] = useState("");
   const [unlockNotice, setUnlockNotice] = useState("현재 위치를 확인하면 방문 인증과 부품 해금이 진행됩니다.");
   const [unlockedParts, setUnlockedParts] = useState<string[]>([]);
   const [partAssets, setPartAssets] = useState<PartAsset[]>([]);
@@ -124,6 +155,11 @@ export default function JogakApp() {
   const [dragState, setDragState] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [pretravelConceptUrl, setPretravelConceptUrl] = useState<string | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const screenRef = useRef<Screen>("login");
+
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
 
   useEffect(() => {
     const storedName = window.localStorage.getItem("jogak_user_name");
@@ -173,6 +209,34 @@ export default function JogakApp() {
   }, []);
 
   useEffect(() => {
+    const storedJobId = window.localStorage.getItem(ACTIVE_JOB_STORAGE_KEY);
+    if (!storedJobId) return;
+    let cancelled = false;
+
+    fetchJob(storedJobId)
+      .then((storedJob) => {
+        if (cancelled) return;
+        setJob(storedJob);
+        setJobProgress(storedJob.progress || 0);
+        if (storedJob.status === "done") {
+          handleFinishedJob(storedJob);
+        }
+        if (storedJob.status === "failed") {
+          window.localStorage.removeItem(ACTIVE_JOB_STORAGE_KEY);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setJobPollWarning("저장된 작업 상태를 다시 확인하는 중입니다.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     fetchDestinations(query)
       .then((items) => {
         setDestinations(items);
@@ -205,46 +269,120 @@ export default function JogakApp() {
   }, [selectedDestination?.id]);
 
   useEffect(() => {
-    if (screen !== "generate") return;
+    if (!job?.id || ["done", "failed"].includes(job.status)) return;
     let cancelled = false;
+    let failureCount = 0;
 
-    if (job?.id && !["done", "failed"].includes(job.status)) {
-      const timer = window.setInterval(async () => {
-        try {
-          const nextJob = await fetchJob(job.id);
-          if (cancelled) return;
-          setJob(nextJob);
-          setJobProgress(nextJob.progress);
-          if (nextJob.status === "done") {
-            const conceptUrl = typeof nextJob.result?.concept_url === "string" ? nextJob.result.concept_url : null;
-            const figurineId = typeof nextJob.result?.figurine_id === "string" ? nextJob.result.figurine_id : null;
-            if (conceptUrl && nextJob.type === "pretravel_concept") {
-              setPretravelConceptUrl(conceptUrl);
-            }
-            if (figurineId) {
-              setCurrentFigurineId(figurineId);
-            }
-            window.clearInterval(timer);
-            setScreen("preview");
-          }
-          if (nextJob.status === "failed") {
-            window.clearInterval(timer);
-          }
-        } catch {
-          window.clearInterval(timer);
-          setJob((current) =>
-            current ? { ...current, status: "failed", current_state: "connection_failed", error: "작업 상태를 불러오지 못했습니다." } : current
-          );
+    const poll = async () => {
+      try {
+        const nextJob = await fetchJob(job.id);
+        if (cancelled) return;
+        failureCount = 0;
+        setJobPollWarning("");
+        setJob(nextJob);
+        setJobProgress((current) => Math.max(current, nextJob.progress || 0));
+
+        if (nextJob.status === "done") {
+          handleFinishedJob(nextJob);
         }
-      }, 1800);
-      return () => {
-        cancelled = true;
-        window.clearInterval(timer);
-      };
+        if (nextJob.status === "failed") {
+          window.localStorage.removeItem(ACTIVE_JOB_STORAGE_KEY);
+        }
+      } catch {
+        if (cancelled) return;
+        failureCount += 1;
+        setJobPollWarning(
+          failureCount > 1
+            ? "상태 조회가 잠시 불안정합니다. 작업은 서버에서 계속 진행됩니다."
+            : "작업 상태를 다시 확인하는 중입니다."
+        );
+      }
+    };
+
+    poll();
+    const timer = window.setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [job?.id, job?.status]);
+
+  useEffect(() => {
+    if (!job || ["done", "failed"].includes(job.status)) return;
+    const timer = window.setInterval(() => {
+      setJobProgress((current) => {
+        const serverProgress = job.progress || 0;
+        const floor = Math.max(current, serverProgress);
+        const ceiling = estimatedProgressCeiling(job);
+        if (floor >= ceiling) return floor;
+        const step = job.current_state?.includes("hunyuan") ? 0.28 : 0.65;
+        return Math.min(ceiling, floor + step);
+      });
+    }, 1400);
+    return () => window.clearInterval(timer);
+  }, [job?.id, job?.status, job?.progress, job?.current_state]);
+
+  function trackJob(nextJob: JobStatus) {
+    setJob(nextJob);
+    setJobProgress(Math.max(nextJob.progress || 0, 4));
+    setJobPollWarning("");
+    setJobNotice(null);
+    window.localStorage.setItem(ACTIVE_JOB_STORAGE_KEY, nextJob.id);
+  }
+
+  function handleFinishedJob(nextJob: JobStatus) {
+    const conceptUrl = typeof nextJob.result?.concept_url === "string" ? nextJob.result.concept_url : null;
+    const figurineId = typeof nextJob.result?.figurine_id === "string" ? nextJob.result.figurine_id : null;
+    const destinationId = typeof nextJob.result?.destination_id === "string" ? nextJob.result.destination_id : null;
+    if (conceptUrl && nextJob.type === "pretravel_concept") {
+      setPretravelConceptUrl(conceptUrl);
+    }
+    if (figurineId) {
+      setCurrentFigurineId(figurineId);
+    }
+    if (destinationId) {
+      const destination = destinations.find((item) => item.id === destinationId);
+      if (destination) {
+        setSelectedDestination(destination);
+      }
     }
 
-    setJobProgress(0);
-  }, [screen, job?.id, job?.status]);
+    setJob(nextJob);
+    setJobProgress(100);
+    setJobPollWarning("");
+    window.localStorage.removeItem(ACTIVE_JOB_STORAGE_KEY);
+
+    if (screenRef.current === "generate") {
+      setScreen("preview");
+      return;
+    }
+
+    const title = nextJob.type === "hunyuan_final"
+      ? "최종 3D가 완성됐어요"
+      : nextJob.type === "editor_refine_2d"
+        ? "자연 배치 2D가 완성됐어요"
+        : "방문 전 프리뷰가 완성됐어요";
+    setJobNotice({
+      job: nextJob,
+      title,
+      message: "눌러서 프리뷰를 확인하세요."
+    });
+
+    if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+      new Notification(title, {
+        body: "조각에서 결과를 확인할 수 있습니다.",
+        icon: "/icons/jogak-transparent.png"
+      });
+    }
+  }
+
+  function openJobNotice() {
+    if (!jobNotice) return;
+    setJob(jobNotice.job);
+    setJobProgress(100);
+    setJobNotice(null);
+    setScreen("preview");
+  }
 
   const selected = useMemo(
     () => layers.find((layer) => layer.id === selectedLayer) || null,
@@ -311,11 +449,12 @@ export default function JogakApp() {
     try {
       const result = await createPretravelConcept(form);
       setCurrentFigurineId(result.figurine_id);
-      setJob({ id: result.job_id, type: "pretravel_concept", status: result.status, progress: 4 });
+      trackJob({ id: result.job_id, type: "pretravel_concept", status: result.status, progress: 4 });
     } catch {
       setJob({ id: "create_failed", type: "pretravel_concept", status: "failed", progress: 0, error: "방문 전 프리뷰 작업을 시작하지 못했습니다." });
     }
     setJobProgress(4);
+    setJobReturnScreen("maker");
     setScreen("generate");
   }
 
@@ -389,11 +528,11 @@ export default function JogakApp() {
       setEditorSessionId(session.id);
       await patchEditorLayers(session.id, layers);
       const result = await finalizeEditor3D(session.id);
-      setJob({ id: result.job_id, type: "hunyuan_final", status: result.status, progress: 4 });
-      setJobProgress(4);
+      trackJob({ id: result.job_id, type: "hunyuan_final", status: result.status, progress: 4 });
     } catch {
       setJob({ id: "editor_failed", type: "hunyuan_final", status: "failed", progress: 0, error: "편집 결과를 저장하거나 재생성 작업을 시작하지 못했습니다." });
     }
+    setJobReturnScreen("editor");
     setScreen("generate");
   }
 
@@ -409,11 +548,11 @@ export default function JogakApp() {
       setEditorSessionId(session.id);
       await patchEditorLayers(session.id, layers);
       const result = await refineEditor2D(session.id);
-      setJob({ id: result.job_id, type: "editor_refine_2d", status: result.status, progress: 4 });
-      setJobProgress(4);
+      trackJob({ id: result.job_id, type: "editor_refine_2d", status: result.status, progress: 4 });
     } catch {
       setJob({ id: "editor_refine_failed", type: "editor_refine_2d", status: "failed", progress: 0, error: "자연 배치 2D 미리보기 작업을 시작하지 못했습니다." });
     }
+    setJobReturnScreen("editor");
     setScreen("generate");
   }
 
@@ -546,6 +685,13 @@ export default function JogakApp() {
               </button>
             </header>
 
+            {jobNotice && (
+              <JobNoticeBanner notice={jobNotice} onOpen={openJobNotice} onDismiss={() => setJobNotice(null)} />
+            )}
+            {job && !["done", "failed"].includes(job.status) && screen !== "generate" && (
+              <JobProgressBanner job={job} progress={jobProgress} warning={jobPollWarning} onOpen={() => setScreen("generate")} />
+            )}
+
             <section className="screen-scroll">
               {screen === "home" && (
                 <HomeScreen
@@ -636,7 +782,7 @@ export default function JogakApp() {
               )}
 
               {screen === "generate" && (
-                <GenerateScreen progress={jobProgress} job={job} onCancel={() => setScreen("customize")} />
+                <GenerateScreen progress={jobProgress} job={job} warning={jobPollWarning} onLeave={() => setScreen(jobReturnScreen)} />
               )}
 
               {screen === "editor" && (
@@ -867,7 +1013,7 @@ function ExploreScreen({
             />
           ))
         ) : (
-          <ActionRow icon={<Landmark />} title="불러온 관광지가 없습니다" text="백엔드 데이터나 공공데이터 동기화를 확인해 주세요." tag="EMPTY" />
+          <ActionRow icon={<Landmark />} title="불러온 관광지가 없습니다" text="관광지 목록을 다시 불러와 주세요." tag="EMPTY" />
         )}
       </div>
     </div>
@@ -906,7 +1052,7 @@ function DestinationScreen({
       <h1 className="title-tight">{destination.name}</h1>
       <p className="desc">{destination.summary}</p>
       {destination.representative_image_url && (
-        <img className="destination-photo" src={destination.representative_image_url} alt={`${destination.name} 공공데이터 대표 이미지`} />
+        <img className="destination-photo" src={destination.representative_image_url} alt={`${destination.name} 대표 이미지`} />
       )}
       <div className="map-panel">
         <iframe
@@ -920,11 +1066,11 @@ function DestinationScreen({
         <ActionRow icon={<BookOpen />} title="대표 이야기" text={destination.dna} tag="STORY" onClick={onStory} />
         <ActionRow
           icon={<ImageIcon />}
-          title="공공데이터 자료"
+          title="관광지 자료"
           text={
             cultureData?.destination_sources.length
-              ? `${cultureData.destination_sources[0].provider} 자료 ${cultureData.destination_sources.length}건이 연결됐습니다.`
-              : "공공데이터 동기화 후 공식 관광정보와 이미지가 연결됩니다."
+              ? `${destination.name}에 대한 이야기 ${cultureData.destination_sources.length}건이 연결됐습니다.`
+              : "관광지 자료를 불러오면 대표 이야기와 이미지가 연결됩니다."
           }
           tag={cultureData?.destination_sources.length ? "연결됨" : "대기"}
         />
@@ -1084,7 +1230,7 @@ function PartsScreen({
         </button>
       </div>
       <h1 className="title-tight">이곳에서 만들 수 있는 조각</h1>
-      <p className="desc">부품은 이미 제작되어 있으며, 공공데이터는 원본 문화유산과 전시 기간을 연결합니다.</p>
+      <p className="desc">부품은 이미 제작되어 있으며, 각 부품에는 실제 문화유산과 전시 이야기가 연결됩니다.</p>
       <div className="label">해금 가능한 부품 {parts.length || destination.parts.length}</div>
       <div className="part-catalog">
         {parts.length ? parts.map((part) => {
@@ -1094,12 +1240,12 @@ function PartsScreen({
               {part.image_url ? <img src={part.image_url} alt="" /> : <div className="part-image-empty" />}
               <div>
                 <b>{part.name}</b>
-                <span>{source ? sourceFact(source) : "공공데이터 원본 연결 대기"}</span>
+                <span>{source ? sourceFact(source) : "문화유산 이야기 연결 대기"}</span>
                 {part.limited && (
                   <em>{part.limited_available ? "현재 전시 한정 해금 가능" : "전시 기간 외 잠김"}</em>
                 )}
               </div>
-              <small>{source ? "SOURCE" : part.slot.toUpperCase()}</small>
+              <small>{source ? "이야기" : part.slot.toUpperCase()}</small>
             </article>
           );
         }) : destination.parts.map((part) => (
@@ -1204,17 +1350,77 @@ function CustomizeScreen({ style, onStyle, onEditor }: { style: string; onStyle:
   );
 }
 
-function GenerateScreen({ progress, job, onCancel }: { progress: number; job: JobStatus | null; onCancel: () => void }) {
+function JobProgressBanner({
+  job,
+  progress,
+  warning,
+  onOpen
+}: {
+  job: JobStatus;
+  progress: number;
+  warning: string;
+  onOpen: () => void;
+}) {
+  const roundedProgress = Math.max(0, Math.min(100, Math.round(progress)));
+  return (
+    <button className="job-banner running" onClick={onOpen} type="button">
+      <Bell aria-hidden />
+      <span>
+        <b>{jobStatusLabel(job)}</b>
+        <small>{warning || `${roundedProgress}% 진행 중 · 눌러서 작업 화면 보기`}</small>
+      </span>
+      <em>{roundedProgress}%</em>
+    </button>
+  );
+}
+
+function JobNoticeBanner({
+  notice,
+  onOpen,
+  onDismiss
+}: {
+  notice: JobNotice;
+  onOpen: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="job-banner done">
+      <button className="job-banner-main" onClick={onOpen} type="button">
+        <Check aria-hidden />
+        <span>
+          <b>{notice.title}</b>
+          <small>{notice.message}</small>
+        </span>
+      </button>
+      <button className="job-banner-close" onClick={onDismiss} type="button" aria-label="알림 닫기">
+        <X aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+function GenerateScreen({
+  progress,
+  job,
+  warning,
+  onLeave
+}: {
+  progress: number;
+  job: JobStatus | null;
+  warning: string;
+  onLeave: () => void;
+}) {
   const failed = job?.status === "failed";
   const isFinal = job?.type === "hunyuan_final";
   const isRefine = job?.type === "editor_refine_2d";
+  const roundedProgress = Math.max(0, Math.min(100, Math.round(progress)));
   return (
     <div className="screen-section">
       <div className="screen-heading">
         <h1>{isFinal ? "최종 3D를 조립하고 있어요" : isRefine ? "배치 이미지를 정리하고 있어요" : "방문 전 프리뷰를 만들고 있어요"}</h1>
-        <button className="icon-text" onClick={onCancel} type="button">
+        <button className="icon-text" onClick={onLeave} type="button">
           <X aria-hidden />
-          취소
+          나중에 보기
         </button>
       </div>
       <p className="desc">
@@ -1227,15 +1433,20 @@ function GenerateScreen({ progress, job, onCancel }: { progress: number; job: Jo
               : "해금 부품은 넣지 않고, 의상과 원판, 장소 분위기만 반영한 방문 전 2D/3D 프리뷰를 만듭니다."}
       </p>
       <div className="progress-meter">
-        <span style={{ width: `${progress}%` }} />
+        <span style={{ width: `${roundedProgress}%` }} />
       </div>
+      <div className="job-status-line">
+        <b>{roundedProgress}%</b>
+        <span>{jobStatusLabel(job)}</span>
+      </div>
+      {warning && <p className="job-warning">{warning}</p>}
       <div className="progress-list">
         <Step done={progress > 24} now={progress <= 24} title="문화 DNA 정리" text="장소 특색과 사용자 입력을 합칩니다." tag="DNA" />
         <Step
           done={progress > 52}
           now={progress > 24 && progress <= 52}
           title={isFinal ? "최종 2D 배치 확인" : "2D 프리뷰"}
-          text={isFinal ? "부품 모양을 유지하며 착용, 손, 배경, 베이스 관계를 정리합니다." : "OpenAI Images API가 Hunyuan 친화적인 입력 이미지를 만듭니다."}
+          text={isFinal ? "부품 모양을 유지하며 착용, 손, 배경, 베이스 관계를 정리합니다." : "장소 분위기와 인물 사진을 바탕으로 3D에 잘 맞는 입력 이미지를 만듭니다."}
           tag="2D"
         />
         <Step
@@ -1253,7 +1464,7 @@ function GenerateScreen({ progress, job, onCancel }: { progress: number; job: Jo
           tag="STL"
         />
       </div>
-      <p className="data-note">Job {job?.id || "local"} · {job?.status || "queued"} · GPU index 7 only</p>
+      <p className="data-note">Job {job?.id || "local"} · {job?.status || "queued"} · 화면을 나가도 서버 작업은 계속됩니다 · GPU index 7 only</p>
     </div>
   );
 }
@@ -1511,9 +1722,8 @@ function StoryScreen({
   onBack: () => void;
 }) {
   const sourcedParts = parts.filter((part) => part.public_sources.length);
-  const officialUrl =
-    sourcedParts[0]?.public_sources[0]?.source_url ||
-    cultureData?.destination_sources[0]?.source_url;
+  const officialUrl = officialDestinationUrl(destination, cultureData, sourcedParts);
+  const storyCount = sourcedParts.reduce((total, part) => total + part.public_sources.length, 0);
   return (
     <div className="screen-section">
       <div className="screen-heading">
@@ -1528,21 +1738,21 @@ function StoryScreen({
       </div>
       <h1 className="title-tight">{destination.name} 이야기</h1>
       <div className="action-list">
-        <ActionRow icon={<Gem />} title="문화 DNA" text={destination.dna} tag="DNA" />
+        <ActionRow icon={<Gem />} title="이곳의 분위기" text={destination.dna} tag="장소" />
         <ActionRow
           icon={<BookOpen />}
-          title="공공데이터 근거"
-          text={`${sourcedParts.length}개 부품에 유물·문양·전시 원본이 연결되어 생성 제약에 반영됩니다.`}
-          tag="SOURCE"
+          title="조각에 담긴 소재"
+          text={heritagePartSummary(sourcedParts, destination)}
+          tag={`${storyCount}개`}
         />
         <ActionRow
           icon={<ImageIcon />}
-          title="고증 반영"
-          text="공식 데이터의 시대, 재질, 소장기관과 문양 정보를 2D 생성 프롬프트에 사용합니다."
-          tag="AI"
+          title="여행 후 열리는 이야기"
+          text="해금된 부품을 누르면 실제 유물, 시대, 소재와 연결된 짧은 해설을 함께 볼 수 있습니다."
+          tag="해금"
         />
       </div>
-      <div className="label">부품별 문화유산</div>
+      <div className="label">부품별 문화유산 이야기</div>
       <div className="source-list">
         {sourcedParts.length ? sourcedParts.map((part) => (
           <section className="provenance-part" key={part.id}>
@@ -1550,7 +1760,7 @@ function StoryScreen({
               {part.image_url && <img src={part.image_url} alt="" />}
               <div>
                 <b>{part.name}</b>
-                <span>{part.public_sources.length}개 공공데이터 근거</span>
+                <span>{part.public_sources.length}개의 문화유산 이야기</span>
               </div>
             </div>
             {part.public_sources.map((source) => (
@@ -1559,14 +1769,14 @@ function StoryScreen({
           </section>
         )) : (
           <div className="empty-source">
-            <b>아직 연결된 원본 레코드가 없습니다.</b>
-            <span>공공데이터 키와 Culture Portal endpoint를 설정한 뒤 동기화하면 표시됩니다.</span>
+            <b>아직 이 장소에 연결된 문화유산 이야기가 없습니다.</b>
+            <span>관광지 자료를 동기화하면 전시와 유물 이야기가 표시됩니다.</span>
           </div>
         )}
       </div>
       {!!cultureData?.exhibitions.length && (
         <>
-          <div className="label">기간 한정 전시</div>
+          <div className="label">지금 볼 수 있는 전시</div>
           <div className="source-list">
             {cultureData.exhibitions.map((source) => <PublicSourceRow key={source.id} source={source} />)}
           </div>
@@ -1575,7 +1785,7 @@ function StoryScreen({
       <div className="button-stack">
         <button className="primary" type="button" onClick={() => officialUrl && window.open(officialUrl, "_blank", "noopener,noreferrer")} disabled={!officialUrl}>
           <BookOpen aria-hidden />
-          공식 정보 열기
+          관광 정보 열기
         </button>
       </div>
     </div>
@@ -1583,20 +1793,25 @@ function StoryScreen({
 }
 
 function PublicSourceRow({ source }: { source: PublicDataSource }) {
-  return (
-    <a
-      className="public-source-row"
-      href={source.source_url || undefined}
-      target={source.source_url ? "_blank" : undefined}
-      rel={source.source_url ? "noreferrer" : undefined}
-    >
+  const readableUrl = readableSourceUrl(source);
+  const content = (
+    <>
       <div>
-        <b>{source.title}</b>
+        <b>{displaySourceTitle(source)}</b>
         <span>{sourceFact(source)}</span>
         {(source.starts_at || source.ends_at) && <em>{formatPublicPeriod(source)}</em>}
       </div>
-      <small>{source.provider}</small>
+      <small>{displayProvider(source)}</small>
+    </>
+  );
+  return readableUrl ? (
+    <a className="public-source-row" href={readableUrl} target="_blank" rel="noreferrer">
+      {content}
     </a>
+  ) : (
+    <div className="public-source-row" role="group">
+      {content}
+    </div>
   );
 }
 
@@ -1761,9 +1976,98 @@ function openRoute(destination: Destination) {
   window.open(`https://www.openstreetmap.org/directions?to=${destination.lat}%2C${destination.lon}`, "_blank", "noopener,noreferrer");
 }
 
+function stripPartSuffix(value: string) {
+  return value
+    .replace(/\s+(base|prop|head|pattern|pose|ticket|scroll|jar|body|texture|tag|season)$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanPublicField(value?: string | null) {
+  if (!value) return null;
+  const text = value.trim().replace(/\s+/g, " ");
+  if (!text) return null;
+  if (/JOGAK|로컬\s*fallback|fallback|카탈로그|메타데이터|endpoint|openapi|TourAPI 연동 대상|API 승인/i.test(text)) return null;
+  return text;
+}
+
+function cleanSourceSummary(value?: string | null) {
+  if (!value) return null;
+  let text = value.trim().replace(/\s+/g, " ");
+  if (!text) return null;
+  text = text.replace(
+    /(.+?)의 장소성\((.+?)\)을 반영하는 JOGAK 해금 부품 메타데이터입니다\.?\s*/g,
+    "$1의 $2 분위기를 담은 부품입니다. "
+  );
+  text = text.replace(/AI 생성 시 형태를 훼손하지 않고\s*(.+?)의 정체성을 유지합니다\.?/g, (_, name: string) => {
+    const readableName = stripPartSuffix(name);
+    return `${readableName}의 형태와 분위기를 살립니다.`;
+  });
+  text = text
+    .replace(/JOGAK 해금 부품 메타데이터입니다\.?\s*/g, "")
+    .replace(/AI 생성 시[^.。]+[.。]\s*/g, "")
+    .replace(/생성 제약에 반영됩니다\.?/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text || /JOGAK|카탈로그|메타데이터|endpoint|openapi|API 승인/i.test(text)) return null;
+  return text;
+}
+
+function displaySourceTitle(source: PublicDataSource) {
+  return stripPartSuffix(cleanPublicField(source.title) || source.title || "문화유산 요소");
+}
+
+function displayProvider(source: PublicDataSource) {
+  const provider = cleanPublicField(source.provider);
+  const institution = cleanPublicField(source.institution);
+  if (provider?.includes("한국관광공사")) return "한국관광공사";
+  if (provider?.includes("문화체육관광부")) return "문화체육관광부";
+  return provider || institution || "문화유산 자료";
+}
+
 function sourceFact(source: PublicDataSource) {
-  const facts = [source.period, source.material, source.institution].filter(Boolean);
-  return facts.length ? facts.join(" · ") : `${source.provider} 공식 데이터`;
+  const summary = cleanSourceSummary(source.summary);
+  if (summary) return summary;
+  const facts = [source.period, source.material, source.institution].map(cleanPublicField).filter(Boolean);
+  return facts.length ? facts.join(" · ") : `${displaySourceTitle(source)}와 연결된 이야기입니다.`;
+}
+
+function readableSourceUrl(source: PublicDataSource) {
+  const url = source.source_url?.trim();
+  if (!url || !/^https?:\/\//i.test(url)) return undefined;
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.includes("data.go.kr") || lowerUrl.includes("openapi") || lowerUrl.includes("/api/") || lowerUrl.includes("servicekey")) {
+    return undefined;
+  }
+  return url;
+}
+
+function heritagePartSummary(parts: PartAsset[], destination: Destination) {
+  const sourceTitles = parts
+    .flatMap((part) => part.public_sources)
+    .map(displaySourceTitle)
+    .filter(Boolean);
+  const materials = parts
+    .flatMap((part) => part.public_sources)
+    .map((source) => cleanPublicField(source.material))
+    .filter(Boolean);
+  const uniqueTitles = Array.from(new Set(sourceTitles)).slice(0, 3);
+  const uniqueMaterials = Array.from(new Set(materials)).slice(0, 2);
+  if (!uniqueTitles.length) return `${destination.name}의 시대와 소재 이야기를 조각에 담을 준비를 하고 있습니다.`;
+  const titleText = uniqueTitles.join(", ");
+  const tail = sourceTitles.length > uniqueTitles.length ? " 등이" : "이";
+  const materialText = uniqueMaterials.length ? ` ${uniqueMaterials.join(", ")}의 질감도 함께 살립니다.` : "";
+  return `${titleText}${tail} ${destination.name}의 분위기와 이어집니다.${materialText}`;
+}
+
+function officialDestinationUrl(destination: Destination, cultureData: DestinationCulture | null, parts: PartAsset[]) {
+  const readableSource = [
+    ...(cultureData?.destination_sources || []),
+    ...parts.flatMap((part) => part.public_sources)
+  ].map(readableSourceUrl).find(Boolean);
+  if (readableSource) return readableSource;
+  if (destination.name.includes("국립중앙박물관")) return "https://www.museum.go.kr/site/main/home";
+  return `https://korean.visitkorea.or.kr/search/search_list.do?keyword=${encodeURIComponent(destination.name)}`;
 }
 
 function formatPublicPeriod(source: PublicDataSource) {

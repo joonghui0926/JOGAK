@@ -24,7 +24,7 @@ def main() -> None:
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = settings.pytorch_cuda_alloc_conf
     connection = Redis.from_url(settings.redis_url)
     queue = Queue("jogak-gpu", connection=connection)
-    worker = Worker([queue], connection=connection, name="jogak-gpu7-worker")
+    worker = Worker([queue], connection=connection, name=f"jogak-gpu7-worker-{os.getpid()}")
     worker.work(with_scheduler=True)
 
 

@@ -708,6 +708,109 @@ button {
   transition: width .35s ease;
 }
 
+.job-status-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin: -12px 0 20px;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.job-status-line b {
+  color: var(--ink);
+}
+
+.job-warning {
+  margin: -8px 0 18px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
+.job-banner {
+  position: absolute;
+  top: 84px;
+  left: 18px;
+  right: 18px;
+  z-index: 30;
+  min-height: 58px;
+  border: 1px solid rgba(17,17,17,.16);
+  background: rgba(251,250,247,.96);
+  box-shadow: 0 14px 34px rgba(22,20,17,.12);
+  backdrop-filter: blur(14px);
+  color: var(--ink);
+}
+
+.job-banner.running,
+.job-banner-main {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.job-banner.running {
+  width: auto;
+}
+
+.job-banner.done {
+  display: grid;
+  grid-template-columns: 1fr 42px;
+}
+
+.job-banner-main {
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.job-banner svg {
+  width: 18px;
+  height: 18px;
+}
+
+.job-banner b,
+.job-banner small {
+  display: block;
+}
+
+.job-banner b {
+  font-size: 12px;
+  font-weight: 860;
+}
+
+.job-banner small {
+  margin-top: 2px;
+  color: var(--sub);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.job-banner em {
+  color: var(--gold);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 880;
+}
+
+.job-banner-close {
+  border: 0;
+  border-left: 1px solid rgba(17,17,17,.12);
+  background: transparent;
+  color: var(--sub);
+  display: grid;
+  place-items: center;
+}
+
+.app-phone:has(.job-banner) .screen-scroll {
+  padding-top: 78px;
+}
+
 .edit-stage {
   touch-action: none;
 }
