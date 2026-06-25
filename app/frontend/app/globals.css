@@ -1457,6 +1457,7 @@ button {
     max-width: none;
     margin: 28px auto 0;
     gap: 12px;
+    grid-template-columns: 1fr;
   }
 
   .button-stack .primary,
@@ -1464,24 +1465,20 @@ button {
     min-height: 54px;
   }
 
-  .button-stack .primary:first-child:nth-last-child(n + 2) {
-    grid-column: 1 / -1;
+  .button-stack:has(.primary:first-child:nth-last-child(3)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .button-stack:has(.secondary + .secondary),
-  .button-stack:has(.primary + .secondary) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .button-stack .primary:first-child:nth-last-child(3),
+  .button-stack .primary:first-child:last-child,
+  .button-stack .secondary:first-child:last-child {
+    grid-column: 1 / -1;
   }
 
   .button-stack .primary:first-child:last-child,
   .button-stack .secondary:first-child:last-child {
     width: min(420px, 100%);
-    grid-column: 1 / -1;
     justify-self: center;
-  }
-
-  .button-stack .primary:first-child:nth-last-child(3) {
-    grid-column: 1 / -1;
   }
 
   .model-viewer + .chips,
