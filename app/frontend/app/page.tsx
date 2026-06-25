@@ -466,6 +466,7 @@ export default function JogakApp() {
 
   return (
     <main className="app-frame">
+      <ServiceWorkerRegister />
       <section className={`app-phone ${screen === "login" ? "auth-mode" : ""}`}>
         {screen === "login" ? (
           <LoginScreen
@@ -486,7 +487,6 @@ export default function JogakApp() {
                   <strong>{screenTitles[screen]}</strong>
                 </div>
               </button>
-              <ServiceWorkerRegister />
             </header>
 
             <section className="screen-scroll">
