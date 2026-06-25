@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from jogak_api.core.config import get_settings
@@ -40,6 +41,52 @@ def gpu7_env() -> dict[str, str]:
     return env
 
 
+def current_gpu_free_memory_mb() -> int | None:
+    settings = get_settings()
+    gpu_index = settings.nvidia_visible_devices.split(",")[0].strip() or settings.cuda_visible_devices.split(",")[0].strip()
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "-i",
+                gpu_index,
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    first_line = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
+    try:
+        return int(first_line)
+    except ValueError:
+        return None
+
+
+def wait_for_hunyuan_gpu() -> None:
+    settings = get_settings()
+    minimum_mb = settings.hunyuan3d_min_free_memory_mb
+    if minimum_mb <= 0:
+        return
+    deadline = time.monotonic() + max(settings.hunyuan3d_gpu_wait_timeout_seconds, 0)
+    last_free_mb: int | None = None
+    while True:
+        free_mb = current_gpu_free_memory_mb()
+        if free_mb is None or free_mb >= minimum_mb:
+            return
+        last_free_mb = free_mb
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                f"GPU {settings.nvidia_visible_devices} free memory is {last_free_mb}MB, "
+                f"below required {minimum_mb}MB for Hunyuan generation"
+            )
+        time.sleep(max(settings.hunyuan3d_gpu_wait_poll_seconds, 1))
+
+
 def generate_glb_from_image(
     *,
     image_path: Path,
@@ -58,6 +105,8 @@ def generate_glb_from_image(
         raise RuntimeError("JOGAK_ENABLE_HUNYUAN must be true to generate a 3D preview")
     if not settings.hunyuan3d_repo.exists():
         raise RuntimeError(f"Hunyuan3D repository is not installed: {settings.hunyuan3d_repo}")
+
+    wait_for_hunyuan_gpu()
 
     use_blender_postprocess = settings.hunyuan3d_blender_postprocess if blender_postprocess is None else blender_postprocess
     use_round_plinth = settings.hunyuan3d_round_plinth if round_plinth is None else round_plinth

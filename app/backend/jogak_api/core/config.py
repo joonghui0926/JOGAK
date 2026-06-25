@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     hunyuan3d_blender_postprocess: bool = True
     hunyuan3d_round_plinth: bool = True
     hunyuan3d_plinth_height_ratio: float = 0.075
+    hunyuan3d_min_free_memory_mb: int = 18000
+    hunyuan3d_gpu_wait_timeout_seconds: int = 3600
+    hunyuan3d_gpu_wait_poll_seconds: int = 30
     jogak_enable_hunyuan: bool = False
     jogak_sync_jobs: bool = False
     blender_bin: str = "blender"
